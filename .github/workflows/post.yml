@@ -1,0 +1,29 @@
+name: Auto post to Telegram
+
+on:
+  schedule:
+    - cron: "0 10 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish next post
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python3 scripts/post_once.py
+
+      - name: Save state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add state.json
+          git diff --staged --quiet || git commit -m "next post index updated"
+          git push
