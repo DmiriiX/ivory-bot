@@ -103,7 +103,7 @@ def post_telegram(post):
     photo = post.get("photo", "")
     link = (post.get("link") or "https://ivory-art.com").strip()
     keyboard = {
-        "inline_keyboard": [[{"text": "🖼 Смотреть эту работу", "url": link}]]
+        "inline_keyboard": [[{"text": "Больше картин на нашем сайте", "url": link}]]
     }
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendPhoto"
     payload = {
@@ -150,7 +150,7 @@ def post_max(post):
         "payload": {
             "buttons": [[{
                 "type": "link",
-                "text": "Смотреть эту работу",
+                "text": "Больше картин на нашем сайте",
                 "url": link,
             }]]
         },
