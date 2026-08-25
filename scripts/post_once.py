@@ -4,6 +4,8 @@ import os
 import random
 import sys
 import urllib.request
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
