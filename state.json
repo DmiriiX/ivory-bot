@@ -1,3 +1,8 @@
 {
-  "next_index": 2
+  "next_index": 2,
+  "used_indices": [
+    5
+  ],
+  "last_artist": "Олег Полюткин",
+  "last_post_at": "2026-08-25T12:59:27.834697+03:00"
 }
