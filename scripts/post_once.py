@@ -138,6 +138,71 @@ def safe_caption(text: str, limit: int = 1024) -> str:
     return text
 
 
+def download_bytes(url):
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; IvoryArtBot/1.0)"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read()
+            if len(data) < 1000:
+                print(f"Downloaded file too small: {len(data)} bytes")
+                return None
+            print(f"Downloaded photo: {len(data)} bytes")
+            return data
+    except Exception as e:
+        print(f"Download photo failed: {e}")
+        return None
+
+
+def telegram_send_photo_multipart(
+    photo_bytes, caption, keyboard, parse_mode="HTML"
+) -> dict:
+    """Загрузка фото файлом — надёжнее, чем URL (Telegram часто не тянет внешние CDN)."""
+    boundary = "----IvoryArtBoundary7MA4YWxkTrZu0gW"
+    api = f"https://api.telegram.org/bot{TG_TOKEN}/sendPhoto"
+
+    def part(name: str, value: str) -> bytes:
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+        ).encode("utf-8")
+
+    body = b""
+    body += part("chat_id", TG_CHANNEL)
+    if caption:
+        body += part("caption", caption)
+        if parse_mode:
+            body += part("parse_mode", parse_mode)
+    body += part("reply_markup", json.dumps(keyboard, ensure_ascii=False))
+    body += (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="photo"; filename="painting.jpg"\r\n'
+        f"Content-Type: image/jpeg\r\n\r\n"
+    ).encode("utf-8")
+    body += photo_bytes
+    body += f"\r\n--{boundary}--\r\n".encode("utf-8")
+
+    req = urllib.request.Request(
+        api,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        print(f"HTTP {e.code} multipart: {err_body}")
+        try:
+            return json.loads(err_body)
+        except Exception:
+            return {"ok": False, "description": err_body}
+
+
 def post_telegram(post):
     if not TG_TOKEN:
         print("Skip Telegram: no BOT_TOKEN")
@@ -151,11 +216,29 @@ def post_telegram(post):
 
     keyboard = {"inline_keyboard": [[{"text": BUTTON_TEXT, "url": link}]]}
 
-    print(f"TG photo: {photo[:80]}...")
+    print(f"TG photo URL: {photo[:90]}...")
     print(f"TG caption length: {len(caption)}")
 
-    result = None
+    # 1) Скачать фото и загрузить файлом (основной способ)
     if photo:
+        photo_bytes = download_bytes(photo)
+        if photo_bytes:
+            result = telegram_send_photo_multipart(photo_bytes, caption, keyboard, "HTML")
+            if result.get("ok"):
+                print("Telegram OK (upload file)")
+                return True
+            print("Multipart HTML failed, retry plain caption...")
+            plain = caption
+            for t in ("<b>", "</b>", "<i>", "</i>", "&amp;"):
+                plain = plain.replace(t, "" if t != "&amp;" else "&")
+            result = telegram_send_photo_multipart(photo_bytes, plain, keyboard, None)
+            if result.get("ok"):
+                print("Telegram OK (upload file, plain)")
+                return True
+            print("Upload file failed:", result)
+
+        # 2) Запасной вариант — отправка по URL
+        print("Trying sendPhoto by URL...")
         url = f"https://api.telegram.org/bot{TG_TOKEN}/sendPhoto"
         payload = {
             "chat_id": TG_CHANNEL,
@@ -166,39 +249,26 @@ def post_telegram(post):
         }
         result = http_json(url, payload)
         if result.get("ok"):
-            print("Telegram OK (photo)")
+            print("Telegram OK (photo URL)")
             return True
-        print("Telegram sendPhoto failed, trying without parse_mode...")
-        payload.pop("parse_mode", None)
-        result = http_json(url, payload)
-        if result.get("ok"):
-            print("Telegram OK (photo, no parse_mode)")
-            return True
-        print("Telegram sendPhoto failed, falling back to text...")
+        print("sendPhoto by URL failed:", result)
 
-    # fallback: текст + ссылка на картину в caption
-    text = caption
-    if photo:
-        text = f"{caption}\n\n{photo}" if caption else photo
-        text = text[:4090]
+    # 3) Только текст (без ссылки на jpg)
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
     payload = {
         "chat_id": TG_CHANNEL,
-        "text": text or "IVORY-ART",
+        "text": caption or "IVORY-ART Gallery",
         "parse_mode": "HTML",
         "reply_markup": keyboard,
-        "disable_web_page_preview": False,
     }
     result = http_json(url, payload)
     if result.get("ok"):
-        print("Telegram OK (text fallback)")
+        print("Telegram OK (text only — фото не удалось)")
         return True
-
-    # last try without HTML
     payload.pop("parse_mode", None)
     result = http_json(url, payload)
     if result.get("ok"):
-        print("Telegram OK (text, no parse_mode)")
+        print("Telegram OK (text only, plain)")
         return True
 
     print("Telegram error:", result)
