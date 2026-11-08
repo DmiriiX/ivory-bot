@@ -87,7 +87,7 @@ async def verify_github_oidc(token):
             and claims.get("repository") == "DmiriiX/ivory-bot"
             and claims.get("ref") == "refs/heads/main"
             and claims.get("workflow_ref") == WORKFLOW_REF
-            and claims.get("event_name") in ("schedule", "workflow_dispatch")
+            and claims.get("event_name") in ("schedule", "workflow_dispatch", "push")
             and claims.get("repository_owner") == "DmiriiX"):
         raise HTTPException(403, "Unauthorized GitHub workflow")
     return claims
@@ -155,7 +155,7 @@ async def sync_instagram(read_file, update_file, identity):
         if record.get("status") == "accepted" and record.get("buffer_post_id"):
             try:
                 remote = await get_buffer_status(record["buffer_post_id"])
-                if remote.get("status") in ("sent", "failed"):
+                if remote.get("status") in ("sent", "error", "failed"):
                     record["status"] = remote["status"]
                     record["external_link"] = remote.get("externalLink")
                     record["checked_at"] = datetime.now(timezone.utc).isoformat()
@@ -166,7 +166,12 @@ async def sync_instagram(read_file, update_file, identity):
     # Don't start a second submission if one is uncertain.
     if any(v.get("status") == "uncertain" for v in records.values()):
         return {"ok": False, "reason": "Uncertain delivery requires manual review"}
-    new = next((p for p in posts if identity("paintings", p) in used and
+    # A one-time admin-approved test may reuse one historically sent painting on Instagram,
+    # but only when its ID is explicitly present in the state and no Instagram record exists.
+    one_shot_id = state.get("test_post_id")
+    test_candidate = next((p for p in posts if identity("paintings", p) == one_shot_id
+                           and one_shot_id in used and one_shot_id not in records), None)
+    new = test_candidate or next((p for p in posts if identity("paintings", p) in used and
                 identity("paintings", p) not in ignored and identity("paintings", p) not in records), None)
     if not new:
         return {"ok": True, "reason": "No new confirmed painting to sync"}
