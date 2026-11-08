@@ -20,7 +20,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
 from schedule_info import next_post, next_instagram_check
-from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status
+from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -406,6 +406,31 @@ async def inspect_failed_instagram_posts():
                 }, ensure_ascii=False))
     except Exception as exc:
         print("Instagram test diagnostic unavailable:", type(exc).__name__)
+
+
+@app.on_event("startup")
+async def audit_uncertain_instagram_posts():
+    try:
+        history, _ = await read_file("paintings", "instagram_state.json")
+        unsure = [v for v in (history.get("records") or {}).values() if v.get("status") == "uncertain"]
+        if not unsure:
+            return
+        recent = await list_recent_instagram_posts()
+        for record in unsure:
+            # Read-only audit; log only identifiers and statuses.
+            expected = record.get("title")
+            from instagram_translations import TITLES
+            keyword = TITLES.get(expected, expected)
+            matches = [x for x in recent if keyword and keyword.casefold() in (x.get("text") or "").casefold()]
+            print("Instagram uncertain-post audit:", json.dumps({
+                "title": expected, "matches": [
+                    {"id": x.get("id"), "status": x.get("status"),
+                     "external_link": x.get("externalLink")}
+                    for x in matches[:5]
+                ],
+            }, ensure_ascii=False))
+    except Exception as exc:
+        print("Instagram uncertain-post audit error:", str(exc)[:220])
 
 
 @app.on_event("startup")
