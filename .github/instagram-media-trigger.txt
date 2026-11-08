@@ -1,0 +1,1 @@
+Check the normalized JPEG for 'Отражения' from the external GitHub Actions runner. Do not send an Instagram post.
