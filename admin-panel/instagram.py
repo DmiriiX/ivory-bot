@@ -73,6 +73,24 @@ async def inspection():
     except Exception as exc:
         return {"configured": True, "connected": False, "error": str(exc)[:240]}
 
+async def list_recent_instagram_posts(first=30):
+    """Read-only Buffer audit to resolve interrupted sends safely."""
+    channel = await instagram_channel()
+    account = await graphql("query { account { organizations { id name } } }")
+    matches = []
+    for org in (account.get("account") or {}).get("organizations") or []:
+        query = """query($org: OrganizationId!) {
+          posts(first: 30, input: {
+            organizationId: $org,
+            filter: {channelIds: [CHANNEL_PLACEHOLDER]},
+            sort: [{field: createdAt, direction: desc}]
+          }) { edges { node { id text status createdAt externalLink } } }
+        }""".replace("CHANNEL_PLACEHOLDER", json.dumps(channel["id"]))
+        response = await graphql(query, {"org": org["id"]})
+        matches.extend([x["node"] for x in (response.get("posts") or {}).get("edges") or [] if x.get("node")])
+    return matches
+
+
 async def verify_github_oidc(token):
     if not token:
         raise HTTPException(401, "GitHub OIDC token required")
