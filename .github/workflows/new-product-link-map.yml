@@ -1,0 +1,45 @@
+name: Map new IVORY-ART catalog product links
+on:
+  push:
+    paths: [".github/new-product-link-trigger.txt"]
+permissions:
+  contents: read
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve every product to the links in the new home catalog
+        run: |
+          python3 - <<'PY'
+          import json,re,urllib.request,urllib.error,html,concurrent.futures
+          posts=json.load(open('posts.json',encoding='utf-8'))
+          req=urllib.request.Request('https://ivory-art.com/',headers={'User-Agent':'Mozilla/5.0 (IVORY-ART link audit)'})
+          with urllib.request.urlopen(req,timeout=45) as resp:
+             home=resp.read(3500000).decode('utf-8','replace')
+          cards={}
+          for m in re.finditer(r'<a[^>]+class="card"[^>]+href="([^"]+)"[^>]+data-id="([0-9]+)"',home,re.I):
+             cards[m.group(2)]=html.unescape(m.group(1))
+          print('PAGE_CARDS',len(cards))
+          def inspect(pair):
+             i,p=pair
+             m=re.search(r'/tproduct/\d+-([0-9]+)-',p['link'])
+             if not m:return {'index':i,'error':'old ID missing'}
+             id=m.group(1)
+             new=cards.get(id)
+             if not new:return {'index':i,'id':id,'title':p['title'],'error':'not found in home catalog'}
+             try:
+               req=urllib.request.Request(new,headers={'User-Agent':'Mozilla/5.0 (IVORY-ART link audit)'})
+               with urllib.request.urlopen(req,timeout=20) as resp:
+                  page=resp.read(360000).decode('utf-8','replace')
+                  title=re.search(r'<title[^>]*>(.*?)</title>',page,re.S|re.I)
+                  title=html.unescape(title.group(1)).strip()[:95] if title else ''
+                  return {'index':i,'id':id,'name':p['title'],'new':new,'status':resp.status,'final':resp.url,'title':title,'matches':p['title'].casefold() in page.casefold()}
+             except urllib.error.HTTPError as e:
+               return {'index':i,'name':p['title'],'new':new,'status':e.code,'final':e.url}
+             except Exception as e:
+               return {'index':i,'name':p['title'],'new':new,'error':type(e).__name__}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+             for result in pool.map(inspect,enumerate(posts)):
+                print('MAPPING',json.dumps(result,ensure_ascii=False))
+          PY
