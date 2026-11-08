@@ -1,1 +1,3 @@
 Inspect old and current catalog product URL patterns. Read-only test, do not publish anything.
+
+Full audit of 50 product URLs plus current catalog HTML on 2026-11-09.
