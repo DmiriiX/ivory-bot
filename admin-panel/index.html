@@ -27,9 +27,10 @@ dialog{border:1px solid var(--line);border-radius:16px;padding:20px;width:min(92
 </style></head><body>
 <main>
 <header><div class="brand">IVORY ART<small>GALLERY · ADMIN</small></div><div id="username">Telegram</div></header>
-<h1>Управление публикациями</h1><p>Картины и факты об искусстве · Telegram и MAX</p>
+<h1>Управление публикациями</h1><p>Картины и факты об искусстве · Telegram, MAX и Instagram</p>
 <div class="tabs"><button class="active" data-kind="paintings">Картины</button><button data-kind="facts">Факты</button></div>
 <div id="error" role="alert"></div>
+<section class="panel"><div class="between"><div><h2>Instagram · @ivoryartgallery</h2><small>Автоматическая публикация через Buffer</small></div><span id="instagram-status" class="status">Проверка</span></div><p id="instagram-details">Статус подключения загружается…</p></section>
 <div class="metrics"><div class="metric"><strong id="total">-</strong><span>Всего</span></div><div class="metric"><strong id="published">-</strong><span>Использовано</span></div><div class="metric"><strong id="remaining">-</strong><span>В очереди</span></div></div>
 <section class="panel"><div class="between"><div><h2 id="heading">Картины</h2><small id="last">Последняя публикация: -</small></div><span id="status" class="status">Загрузка</span></div><div id="pending" style="display:none;color:#a43f35;margin-top:10px"></div>
 <div class="tools"><button id="toggle">Приостановить</button><button id="publish" class="primary">Опубликовать сейчас</button><button id="refresh">Обновить</button></div>
@@ -48,6 +49,7 @@ function err(message){$("error").textContent=message||""}
 async function api(path,body){const r=await fetch(path,{method:body===undefined?"GET":"POST",headers:{"X-Telegram-Init-Data":init,...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body)});const v=await r.json().catch(()=>({detail:"Ошибка ответа"}));if(!r.ok)throw new Error(typeof v.detail==="string"?v.detail:"HTTP "+r.status);return v}
 function text(el,value){el.textContent=value||""}
 function date(d){return d?new Date(d).toLocaleString("ru-RU",{timeZone:"Europe/Moscow"}):"нет"}
+async function checkInstagram(){try{const x=await api("/api/integrations/instagram");text($("instagram-status"),!x.connected?"Не подключён":x.enabled?"Активен":"Готов к включению");text($("instagram-details"),!x.connected?"Buffer: "+(x.error||"Нет подключения"): "Канал: "+x.name+" · Принято Buffer: "+(x.accepted||0)+" · Опубликовано: "+(x.sent||0)+" · Требует проверки: "+((x.uncertain||0)+(x.failed||0)));}catch(e){text($("instagram-status"),"Недоступен");text($("instagram-details"),"Не удалось проверить Instagram: "+e.message)}}
 async function load(){err("");try{state.data=await api("/api/"+state.kind);render()}catch(e){err("Не удалось загрузить данные: "+e.message);$("list").replaceChildren()}}
 function button(label,handler){const b=document.createElement("button");b.textContent=label;b.onclick=handler;return b}
 async function action(path,body,confirmText){if(confirmText&&!confirm(confirmText))return;err("");try{await api("/api/"+state.kind+"/"+path,body);await load()}catch(e){err(e.message)}}
@@ -72,5 +74,5 @@ $("toggle").onclick=()=>action("pause",{paused:!state.data.paused});
 $("publish").onclick=()=>action("publish",{},"Запустить реальную публикацию в Telegram и MAX? Эта операция может создать новый пост.");
 $("refresh").onclick=load;$("cancel").onclick=()=>$("editor").close();
 $("save").onclick=async()=>{const p=state.edit;if(!p)return;$("editor").close();await action("caption",{id:p.id,caption:$("edit-text").value})};
-load();
+load();checkInstagram();
 </script></body></html>
