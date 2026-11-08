@@ -1,0 +1,55 @@
+name: Prepare Instagram media without posting
+on:
+  push:
+    paths:
+      - ".github/instagram-prepare-trigger.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy verified normalized JPEG to public immutable-hosting path
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.request, urllib.error
+          key = "3b539193b85b606dcd1e043c"
+          filename = f"instagram-media/{key}.jpg"
+          github = "https://api.github.com/repos/" + os.environ["GITHUB_REPOSITORY"] + "/contents/" + filename
+          render = "https://ivory-bot-h4gn.onrender.com/instagram-image/" + key + ".jpg"
+          req = urllib.request.Request(render, headers={"User-Agent":"IvoryArtMediaPrep"})
+          with urllib.request.urlopen(req, timeout=120) as resp:
+              data = resp.read(8000001)
+              assert resp.status == 200 and resp.headers.get("Content-Type","").startswith("image/jpeg")
+              assert data[:2] == b"\\xff\\xd8" and data[-2:] == b"\\xff\\xd9"
+          headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"], "Accept":"application/vnd.github+json", "Content-Type":"application/json", "User-Agent":"ivory-art-media-prep"}
+          put = urllib.request.Request(github, data=json.dumps({
+            "message":"Store stable Instagram artwork test image",
+            "content":base64.b64encode(data).decode(),
+            "branch":"main",
+          }).encode(), headers=headers,method="PUT")
+          try:
+              with urllib.request.urlopen(put,timeout=90) as res:
+                  assert res.status in (200,201)
+          except urllib.error.HTTPError as exc:
+              print("GitHub media write HTTP",exc.code)
+              raise
+          public="https://raw.githubusercontent.com/"+os.environ["GITHUB_REPOSITORY"]+"/main/"+filename
+          for attempt in range(12):
+              try:
+                  request=urllib.request.Request(public,method="HEAD",headers={"User-Agent":"IvoryArtMediaPrep"})
+                  with urllib.request.urlopen(request,timeout=20) as resp:
+                      print("Public image HEAD:",resp.status,resp.headers.get("Content-Type",""),resp.headers.get("Content-Length",""))
+                      assert resp.status==200 and resp.headers.get("Content-Type","").startswith("image/")
+                      break
+              except Exception as exc:
+                  if attempt==11: raise
+                  time.sleep(2)
+          print("STABLE PUBLIC IMAGE VERIFIED, BYTES:", len(data))
+          PY
