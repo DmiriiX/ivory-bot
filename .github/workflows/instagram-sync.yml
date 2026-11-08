@@ -20,6 +20,9 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Let Render complete any deployment triggered by this push
+        if: github.event_name == 'push'
+        run: sleep 60
       - name: Authenticated Instagram sync (no API keys in Actions)
         env:
           ADMIN_URL: https://ivory-bot-h4gn.onrender.com/internal/instagram/sync
