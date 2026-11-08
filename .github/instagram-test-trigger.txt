@@ -11,3 +11,5 @@ Verify Buffer status for accepted Instagram artwork; no new post should be creat
 One-time Instagram-only test: Дороги и мечты (Воронова Евгения), 2026-11-09. Do NOT post to Telegram or MAX.
 
 Retry single verified Roads and Dreams with permanent public JPEG after read-only Buffer audit; Telegram and MAX untouched.
+
+Verify Buffer delivery/link for Roads and Dreams. The post already has a Buffer ID; do not create another post.
