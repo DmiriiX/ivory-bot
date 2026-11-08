@@ -354,6 +354,26 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
     return status
 
 
+class InstagramSwitch(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/integrations/instagram/toggle")
+async def instagram_toggle(change: InstagramSwitch, x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    if change.enabled:
+        status = await buffer_inspection()
+        if not status.get("connected"):
+            raise HTTPException(409, "Buffer Instagram @ivoryartgallery is not connected")
+    history, sha = await read_file("paintings", "instagram_state.json")
+    if any(v.get("status") == "uncertain" for v in (history.get("records") or {}).values()):
+        raise HTTPException(409, "Review uncertain Instagram delivery before resuming")
+    history["enabled"] = change.enabled
+    await update_file("paintings", "instagram_state.json", history, sha,
+                      "Admin: enable Instagram" if change.enabled else "Admin: pause Instagram")
+    return {"enabled": change.enabled}
+
+
 @app.post("/internal/instagram/sync")
 async def instagram_sync(request: Request, authorization: str = Header(default="")):
     if not authorization.startswith("Bearer "):
