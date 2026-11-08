@@ -5,3 +5,5 @@ Telegram and MAX must not be invoked.
 Retry #2: use checked public 1080x1350 JPEG, one Instagram-only post. Previous Buffer attempt had status error; not sent to Instagram.
 
 Retry #3 using public, permanent raw.githubusercontent.com JPEG. Do not call Telegram or MAX.
+
+Verify Buffer status for accepted Instagram artwork; no new post should be created.
