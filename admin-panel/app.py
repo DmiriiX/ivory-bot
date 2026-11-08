@@ -174,7 +174,7 @@ async def snapshot(kind):
             "artist": str(p.get("artist") or ""),
             "photo": str(p.get("photo") or ""),
             "caption": str(p.get("caption") or ""),
-            "link": str(p.get("link") or ""),
+            "link": str(p.get("public_link") or p.get("link") or ""),
             "used": identity(kind, p) in used,
             "excluded": identity(kind, p) in excluded,
         }

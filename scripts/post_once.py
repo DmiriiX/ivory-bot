@@ -78,7 +78,7 @@ def multipart(url, fields, image):
 def telegram(post, image):
     token = os.environ["BOT_TOKEN"]
     channel = os.environ["CHANNEL_ID"]
-    button = {"inline_keyboard": [[{"text": BUTTON, "url": post.get("link") or "https://ivory-art.com/catalog"}]]}
+    button = {"inline_keyboard": [[{"text": BUTTON, "url": post.get("public_link") or post.get("link") or "https://ivory-art.com/catalog"}]]}
     caption = (post.get("caption") or post.get("text") or post.get("title") or "")
     api = "https://api.telegram.org/bot" + token + "/"
     if image:
@@ -116,7 +116,7 @@ def max_send(post, image):
         attachments.append({"type": "image", "payload": {"token": max_upload(image)}})
     elif not FACTS:
         return {}, False
-    attachments.append({"type": "inline_keyboard", "payload": {"buttons": [[{"type": "link", "text": BUTTON, "url": post.get("link") or "https://ivory-art.com/catalog"}]]}})
+    attachments.append({"type": "inline_keyboard", "payload": {"buttons": [[{"type": "link", "text": BUTTON, "url": post.get("public_link") or post.get("link") or "https://ivory-art.com/catalog"}]]}})
     text = html.unescape(re.sub(r"<[^>]*>", "", post.get("caption") or post.get("text") or post.get("title") or ""))[:4000]
     url = "https://platform-api2.max.ru/messages?chat_id=" + urllib.parse.quote(os.environ["MAX_CHANNEL_ID"], safe="")
     return call(url, {"text": text, "attachments": attachments, "notify": True}, {"Authorization": os.environ["MAX_BOT_TOKEN"]})
