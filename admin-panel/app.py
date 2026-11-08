@@ -381,7 +381,7 @@ async def instagram_sync(request: Request, authorization: str = Header(default="
     if not authorization.startswith("Bearer "):
         raise HTTPException(401, "Signed GitHub OIDC token required")
     await verify_github_oidc(authorization[7:])
-    return await sync_instagram(read_file, update_file, identity)
+    return await sync_instagram(read_file, update_file, identity, gh)
 
 
 @app.on_event("startup")

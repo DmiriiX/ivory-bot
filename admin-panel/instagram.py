@@ -10,6 +10,8 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+import base64
+from media import normalized_image
 
 import httpx
 import jwt
@@ -100,7 +102,35 @@ def post_caption(post):
     return (raw + "\n\n" + "Картины и скульптуры: ivory-art.com\n" +
             "#ivoryart #картины #живопись #искусство").strip()[:2100]
 
-async def create_buffer_post(channel_id, post):
+async def ensure_public_image(post, item_id, github_api):
+    """Commit an image to public GitHub storage before Buffer reads it."""
+    filename = "instagram-media/" + item_id + ".jpg"
+    public_url = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/" + filename
+
+    async def available():
+        async with httpx.AsyncClient(timeout=25) as client:
+            try:
+                response = await client.head(public_url, follow_redirects=True)
+                return response.status_code == 200 and response.headers.get("content-type", "").startswith("image/")
+            except httpx.HTTPError:
+                return False
+
+    if await available():
+        return public_url
+    image_bytes = await normalized_image(post.get("photo") or "")
+    await github_api("PUT", "paintings", "contents/" + filename, body={
+        "message": "Store stable Instagram artwork " + item_id,
+        "content": base64.b64encode(image_bytes).decode("ascii"),
+        "branch": "main",
+    })
+    for _ in range(8):
+        if await available():
+            return public_url
+        await asyncio.sleep(2)
+    raise RuntimeError("GitHub-hosted artwork has not yet become publicly accessible")
+
+
+async def create_buffer_post(channel_id, post, image_url):
     url = post.get("photo", "")
     if not url.startswith("https://"):
         raise ValueError("Artwork needs a publicly accessible HTTPS image")
@@ -112,11 +142,6 @@ async def create_buffer_post(channel_id, post):
       }
     }
     """
-    # Serve a normalized public 4:5 JPEG rather than the raw catalog file.
-    post_id = hashlib.sha256(("painting:" + str(post.get("link") or post.get("title"))).encode()).hexdigest()[:24]
-    image_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/") + "/instagram-image/" + post_id + ".jpg"
-    if not image_url.startswith("https://"):
-        raise ValueError("PUBLIC_BASE_URL must be an HTTPS URL")
     payload = {
         "text": post_caption(post),
         "channelId": channel_id,
@@ -138,7 +163,7 @@ async def get_buffer_status(buffer_post_id):
     )
     return data["post"]
 
-async def sync_instagram(read_file, update_file, identity):
+async def sync_instagram(read_file, update_file, identity, github_api):
     """One accepted post maximum per run; never resubmit uncertain or accepted IDs."""
     state, sha = await read_file("paintings", "instagram_state.json")
     result = await inspection()
@@ -191,7 +216,8 @@ async def sync_instagram(read_file, update_file, identity):
     if not new_sha:
         _, new_sha = await read_file("paintings", "instagram_state.json")
     try:
-        remote = await create_buffer_post((await instagram_channel())["id"], new)
+        image_url = await ensure_public_image(new, item_id, github_api)
+        remote = await create_buffer_post((await instagram_channel())["id"], new, image_url)
     except ValueError as exc:
         records[item_id]["status"] = "failed"
         records[item_id]["error"] = str(exc)[:250]
@@ -200,8 +226,12 @@ async def sync_instagram(read_file, update_file, identity):
     except Exception:
         # Unknown outcome; keep uncertain for operator review.
         return {"ok": False, "reason": "Unknown Buffer delivery: inspect Buffer queue before retrying", "id": item_id}
-    records[item_id]["status"] = "accepted"
     records[item_id]["buffer_post_id"] = remote["id"]
     records[item_id]["buffer_status"] = remote.get("status", "")
-    await update_file("paintings", "instagram_state.json", state, new_sha, "Record Buffer accepted post")
+    if remote.get("status") in ("error", "failed"):
+        records[item_id]["status"] = "failed"
+        await update_file("paintings", "instagram_state.json", state, new_sha, "Record Buffer media delivery error")
+        return {"ok": False, "id": item_id, "reason": "Buffer failed to publish the image"}
+    records[item_id]["status"] = "accepted"
+    await update_file("paintings", "instagram_state.json", state, new_sha, "Record Buffer accepted Instagram post")
     return {"ok": True, "id": item_id, "status": "accepted"}
