@@ -1,0 +1,1 @@
+Read-only map of all 50 gallery artwork IDs to current new catalog card URLs.
