@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
-from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc
+from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -380,6 +380,24 @@ async def instagram_sync(request: Request, authorization: str = Header(default="
         raise HTTPException(401, "Signed GitHub OIDC token required")
     await verify_github_oidc(authorization[7:])
     return await sync_instagram(read_file, update_file, identity)
+
+
+@app.on_event("startup")
+async def inspect_failed_instagram_posts():
+    try:
+        history, _ = await read_file("paintings", "instagram_state.json")
+        for record in (history.get("records") or {}).values():
+            if record.get("buffer_post_id") and record.get("buffer_status") == "error":
+                remote = await get_buffer_status(record["buffer_post_id"])
+                issue = remote.get("error") or {}
+                print("Instagram test delivery diagnosis:", json.dumps({
+                    "title": record.get("title"),
+                    "status": remote.get("status"),
+                    "message": str(issue.get("message") or "")[:360],
+                    "support_url": str(issue.get("supportUrl") or "")[:180],
+                }, ensure_ascii=False))
+    except Exception as exc:
+        print("Instagram test diagnostic unavailable:", type(exc).__name__)
 
 
 @app.on_event("startup")
