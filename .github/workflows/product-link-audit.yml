@@ -1,0 +1,40 @@
+name: Audit IVORY-ART product links without posting
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/product-link-audit-trigger.txt"
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare old links and new catalog URLs
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, urllib.error, re, concurrent.futures
+          from html import unescape
+          posts=json.load(open('posts.json', encoding='utf-8'))
+          def check(t):
+            i,p,suffix=t
+            old=p['link']
+            candidates=[old,old.replace('/shop/tproduct/','/catalog/tproduct/'),old.replace('/shop/tproduct/','/tproduct/')]
+            out=[]
+            for u in candidates:
+              try:
+                req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0 (compatible; IVORY-ART-LinkCheck/1.0)'})
+                with urllib.request.urlopen(req,timeout=16) as r:
+                  body=r.read(500000).decode('utf-8','replace')
+                  tag=re.search(r'<title[^>]*>(.*?)</title>',body,re.S|re.I)
+                  title=unescape(tag.group(1).strip())[:95] if tag else ''
+                  out.append({'code':r.status,'url':r.url,'title':title,'product_title_in_html':p['title'].casefold() in body.casefold()})
+              except urllib.error.HTTPError as e:out.append({'code':e.code,'url':e.url})
+              except Exception as e:out.append({'error':type(e).__name__})
+            return {'i':i,'title':p['title'],'results':out}
+          indexes=[0,1,7,17,25,31,39,49]
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+            for result in ex.map(check,[(i,posts[i],i) for i in indexes]):
+              print('AUDIT',json.dumps(result,ensure_ascii=False))
+          PY
