@@ -29,7 +29,7 @@ class InstagramSafetyTests(unittest.TestCase):
         import asyncio
         async def trial():
             with self.assertRaises(ValueError):
-                await instagram.create_buffer_post("id", {"photo": "http://example.com/a.jpg"})
+                await instagram.create_buffer_post("id", {"photo": "http://example.com/a.jpg"}, "https://example.com/stable.jpg")
         asyncio.run(trial())
 
     def test_unsigned_oidc_rejected(self):
