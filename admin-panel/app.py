@@ -15,6 +15,9 @@ import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -330,3 +333,39 @@ async def publish(kind: Literal["facts", "paintings"], x_telegram_init_data: str
         "inputs": {"dry_run": "false", "force_post": "true"},
     })
     return {"started": True, "note": "GitHub accepted workflow dispatch; delivery is not yet confirmed"}
+
+@app.get("/api/integrations/instagram")
+async def instagram_status(x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    status = await buffer_inspection()
+    try:
+        history, _ = await read_file("paintings", "instagram_state.json")
+        entries = history.get("records") or {}
+        status.update({
+            "enabled": bool(history.get("enabled")),
+            "already_published_before_connection": len(history.get("baseline_ids") or []),
+            "accepted": sum(v.get("status") in ("accepted", "sent") for v in entries.values()),
+            "sent": sum(v.get("status") == "sent" for v in entries.values()),
+            "uncertain": sum(v.get("status") == "uncertain" for v in entries.values()),
+            "failed": sum(v.get("status") == "failed" for v in entries.values()),
+        })
+    except Exception:
+        status["enabled"] = False
+    return status
+
+
+@app.post("/internal/instagram/sync")
+async def instagram_sync(request: Request, authorization: str = Header(default="")):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Signed GitHub OIDC token required")
+    await verify_github_oidc(authorization[7:])
+    return await sync_instagram(read_file, update_file, identity)
+
+
+@app.on_event("startup")
+async def instagram_probe():
+    result = await buffer_inspection()
+    print("Buffer Instagram: " + ("CONNECTED" if result.get("connected") else "NOT CONNECTED"))
+    if not result.get("connected"):
+        print("Buffer diagnostic: " + str(result.get("error", "unavailable"))[:160])
+

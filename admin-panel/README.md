@@ -48,3 +48,17 @@ The Mini App only reads/writes through its server. It cannot access tokens. The 
 `python -m compileall -q app.py`
 
 There are no background jobs in the Mini App host: GitHub Actions performs publishing.
+
+
+## Instagram via Buffer
+- Render keeps `BUFFER_API_KEY` privately in Environment. Never copy it to GitHub Actions.
+- `/api/integrations/instagram` is available only after Telegram Mini App signature verification.
+- The connected Buffer channel is resolved by name `ivoryartgallery`; the backend refuses ambiguous or missing channels.
+- `.github/workflows/instagram-sync.yml` runs hourly (Moscow daytime), obtains a short-lived **GitHub OIDC** token and calls the Render backend securely without any static credential.
+- The backend checks GitHub's token signature, issuer, audience, repository ID, workflow identity and main branch.
+- Instagram uses `mode: shareNow` and `schedulingType: automatic`, with the artwork's public HTTPS image.
+- `instagram_state.json` has a baseline of the four artworks already published before Instagram was integrated. It tracks separate Instagram acceptance, delivery, and ambiguous results without affecting Telegram/MAX state.
+- Initially `instagram_state.json.enabled` is `false`. Set it to `true` **only after** verifying that the Buffer API key and Instagram channel are valid. This intentionally prevents a live post during installation.
+- A successful Buffer `createPost` only means Buffer accepted the post; the job subsequently checks `post.status` to confirm it was sent.
+- Any network ambiguity is saved as `uncertain` and blocks duplicate resubmission until manually investigated in Buffer.
+- Buffer has plan and Instagram posting limits; the synchronization does not override them.

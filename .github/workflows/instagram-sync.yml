@@ -1,0 +1,50 @@
+name: Sync newly published paintings to Instagram via Buffer
+on:
+  schedule:
+    # After the main paintings publisher (Europe/Moscow 11:00-20:00)
+    - cron: "15 8-18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ivory-art-buffer-instagram
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticated Instagram sync (no API keys in Actions)
+        env:
+          ADMIN_URL: https://ivory-bot-h4gn.onrender.com/internal/instagram/sync
+          AUDIENCE: ivory-art-instagram-sync
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+          url += ("&" if "?" in url else "?") + urllib.parse.urlencode({"audience": os.environ["AUDIENCE"]})
+          token_req = urllib.request.Request(
+              url,
+              headers={"Authorization": "Bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]},
+          )
+          with urllib.request.urlopen(token_req, timeout=30) as response:
+              token = json.load(response)["value"]
+          sync_req = urllib.request.Request(
+              os.environ["ADMIN_URL"],
+              data=b"{}",
+              headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(sync_req, timeout=125) as response:
+              result = json.load(response)
+          print("Instagram sync:", json.dumps(result, ensure_ascii=False))
+          if result.get("ok") is False and result.get("enabled") is not False:
+              raise SystemExit("Instagram sync requires review: " + str(result.get("reason") or "unknown"))
+          PY
