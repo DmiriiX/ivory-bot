@@ -128,7 +128,7 @@ async def create_buffer_post(channel_id, post):
 
 async def get_buffer_status(buffer_post_id):
     data = await graphql(
-        "query($id: PostId!) { post(input: {id: $id}) { id status sentAt externalLink } }",
+        "query($id: PostId!) { post(input: {id: $id}) { id status sentAt externalLink error { message supportUrl } } }",
         {"id": buffer_post_id},
     )
     return data["post"]
