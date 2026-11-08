@@ -1,0 +1,1 @@
+Inspect old and current catalog product URL patterns. Read-only test, do not publish anything.
