@@ -13,10 +13,12 @@ from typing import Literal
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
+import re
 from pydantic import BaseModel, Field
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
+from media import normalized_image
 from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
@@ -407,3 +409,19 @@ async def instagram_probe():
     if not result.get("connected"):
         print("Buffer diagnostic: " + str(result.get("error", "unavailable"))[:160])
 
+
+
+@app.get("/instagram-image/{artwork_id}.jpg")
+async def instagram_media(artwork_id: str):
+    if not re.fullmatch(r"[0-9a-f]{24}", artwork_id):
+        raise HTTPException(404, "Unknown artwork")
+    posts, _ = await read_file("paintings", "posts.json")
+    post = next((p for p in posts if identity("paintings", p) == artwork_id), None)
+    if not post:
+        raise HTTPException(404, "Unknown artwork")
+    try:
+        image = await normalized_image(post.get("photo", ""))
+    except (httpx.HTTPError, ValueError, OSError) as exc:
+        print("Instagram media preparation failed:", type(exc).__name__)
+        raise HTTPException(502, "Artwork image unavailable") from exc
+    return Response(image, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})

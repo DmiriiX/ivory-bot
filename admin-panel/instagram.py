@@ -112,12 +112,17 @@ async def create_buffer_post(channel_id, post):
       }
     }
     """
+    # Serve a normalized public 4:5 JPEG rather than the raw catalog file.
+    post_id = hashlib.sha256(("painting:" + str(post.get("link") or post.get("title"))).encode()).hexdigest()[:24]
+    image_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/") + "/instagram-image/" + post_id + ".jpg"
+    if not image_url.startswith("https://"):
+        raise ValueError("PUBLIC_BASE_URL must be an HTTPS URL")
     payload = {
         "text": post_caption(post),
         "channelId": channel_id,
         "schedulingType": "automatic",
         "mode": "shareNow",
-        "assets": [{"image": {"url": url}}],
+        "assets": [{"image": {"url": image_url}}],
         "metadata": {"instagram": {"type": "post", "shouldShareToFeed": True}},
     }
     data = await graphql(mutation, {"input": payload})
