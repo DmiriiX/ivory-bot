@@ -9,8 +9,10 @@
   "records": {
     "3b539193b85b606dcd1e043c": {
       "title": "Отражения",
-      "status": "uncertain",
-      "created_at": "2026-11-08T21:48:17.460812+00:00"
+      "status": "accepted",
+      "created_at": "2026-11-08T21:48:17.460812+00:00",
+      "buffer_post_id": "6af0ee23562f2e6de9e3d52a",
+      "buffer_status": "sent"
     }
   },
   "test_post_id": "3b539193b85b606dcd1e043c",
