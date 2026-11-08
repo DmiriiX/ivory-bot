@@ -12,6 +12,7 @@ import re
 from datetime import datetime, timezone
 import base64
 from media import normalized_image
+from instagram_translations import TITLES, ARTISTS
 
 import httpx
 import jwt
@@ -95,12 +96,64 @@ async def verify_github_oidc(token):
     return claims
 
 def post_caption(post):
-    raw = re.sub(r"<[^>]+>", "", post.get("caption") or "")
-    raw = html.unescape(raw).strip()
-    title = post.get("title") or ""
-    artist = post.get("artist") or ""
-    return (raw + "\n\n" + "Картины и скульптуры: ivory-art.com\n" +
-            "#ivoryart #картины #живопись #искусство").strip()[:2100]
+    """Instagram only: English first, Russian second, bilingual hashtags.
+
+    The catalog remains untouched. Never assume a translation of an unseen
+    painting title: use a neutral English heading instead of inventing facts.
+    """
+    title_ru = html.unescape(str(post.get("title") or "")).strip()
+    artist_ru = html.unescape(str(post.get("artist") or "")).strip()
+    raw = html.unescape(re.sub(r"<[^>]*>", "", str(post.get("caption") or "")))
+
+    # Extract media and dimensions only when they are present in source data.
+    dimensions = re.search(r"(\d{1,4})\s*[×xхХ]\s*(\d{1,4})\s*см", raw, re.IGNORECASE)
+    dims_en = (f"{dimensions.group(1)} × {dimensions.group(2)} cm" if dimensions else "")
+    dims_ru = (f"{dimensions.group(1)} × {dimensions.group(2)} см" if dimensions else "")
+    source = raw.casefold()
+    if "акварель" in source and "бумага" in source:
+        medium_en = "Watercolor on paper"
+        medium_ru = "Бумага, акварель"
+        if "карандаш" in source:
+            medium_en = "Watercolor and colored pencil on paper"
+            medium_ru = "Бумага, акварель, цветной карандаш"
+        tags_en = "#watercolor #watercolorpainting"
+        tags_ru = "#акварель"
+    elif "акрил" in source:
+        medium_en, medium_ru = "Acrylic on canvas", "Холст, акрил"
+        tags_en, tags_ru = "#acrylicpainting", "#акрил"
+    elif "смешан" in source:
+        medium_en, medium_ru = "Mixed media on canvas", "Холст, смешанная техника"
+        tags_en, tags_ru = "#mixedmediaart", "#смешаннаятехника"
+    elif "масло" in source:
+        medium_en, medium_ru = "Oil on canvas", "Холст, масло"
+        tags_en, tags_ru = "#oilpainting", "#живописьмаслом"
+    else:
+        medium_en, medium_ru = "Original artwork", ""
+        tags_en, tags_ru = "#originalart", "#авторскаяработа"
+
+    title_en = TITLES.get(title_ru, "Original Artwork")
+    artist_en = ARTISTS.get(artist_ru, "IVORY-ART Gallery")
+    english = [
+        f'🎨 "{title_en}"',
+        f'Artist: {artist_en}' if artist_ru and artist_ru != "IVORY-ART" else "IVORY-ART Gallery",
+        " · ".join(x for x in [medium_en, dims_en] if x),
+        "",
+        "Discover the collection at ivory-art.com",
+    ]
+    russian = [
+        f'🇷🇺 «{title_ru}»' if title_ru else "🇷🇺 Оригинальная картина",
+        artist_ru,
+        " · ".join(x for x in [medium_ru, dims_ru] if x),
+        "",
+        "Посмотрите коллекцию на ivory-art.com",
+    ]
+    tags = " ".join([
+        "#ivoryart", "#artgallery", "#contemporaryart", "#originalart",
+        tags_en, "#russianart",
+        "#картины", "#искусство", "#художники", tags_ru, "#галереякартин",
+    ])
+    return ("\n".join(english) + "\n\n" + "\n".join(russian)
+            + "\n\n" + tags).strip()[:2100]
 
 async def ensure_public_image(post, item_id, github_api):
     """Commit an image to public GitHub storage before Buffer reads it."""
