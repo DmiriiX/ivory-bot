@@ -4,6 +4,9 @@ on:
     # After the main paintings publisher (Europe/Moscow 11:00-20:00)
     - cron: "15 8-18 * * *"
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/instagram-test-trigger.txt"
 
 permissions:
   contents: read
