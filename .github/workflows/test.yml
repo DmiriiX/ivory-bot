@@ -15,5 +15,9 @@ jobs:
         run: python3 -m py_compile scripts/post_once.py
       - name: Validate admin backend syntax
         run: python3 -m py_compile admin-panel/app.py
+      - name: Install admin backend dependencies
+        run: python3 -m pip install -r admin-panel/requirements.txt
+      - name: Test Telegram Mini App authentication
+        run: python3 -m unittest discover -s admin-panel/tests -v
       - name: Test publication history and retry
         run: python3 -m unittest discover -s tests -v
