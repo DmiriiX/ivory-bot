@@ -30,6 +30,43 @@ BOT_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 MAX_AGE = 3600
 
+async def _telegram_setup():
+    """Register webhook and Mini App menu without displaying any credential."""
+    if not (TG_TOKEN and BOT_SECRET and BASE.startswith("https://")):
+        print("Telegram setup skipped: incomplete environment")
+        return
+    async with httpx.AsyncClient(timeout=15) as client:
+        for method, payload in (
+            ("setWebhook", {
+                "url": BASE + "/telegram/webhook",
+                "secret_token": BOT_SECRET,
+                "allowed_updates": ["message"],
+                "drop_pending_updates": False,
+            }),
+            ("setChatMenuButton", {
+                "menu_button": {
+                    "type": "web_app",
+                    "text": "Панель IVORY-ART",
+                    "web_app": {"url": BASE},
+                },
+            }),
+        ):
+            try:
+                response = await client.post(
+                    "https://api.telegram.org/bot" + TG_TOKEN + "/" + method,
+                    json=payload,
+                )
+                ok = response.status_code == 200 and response.json().get("ok") is True
+                print("Telegram " + method + ": " + ("OK" if ok else "FAILED status " + str(response.status_code)))
+            except (httpx.HTTPError, ValueError) as exc:
+                print("Telegram " + method + " failed: " + type(exc).__name__)
+
+
+@app.on_event("startup")
+async def register_telegram():
+    await _telegram_setup()
+
+
 
 def ready():
     if not (TG_TOKEN and GITHUB_TOKEN and ADMIN_IDS and BASE.startswith("https://") and BOT_SECRET):
