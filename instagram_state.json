@@ -1,19 +1,21 @@
 {
-  "enabled": false,
+  "enabled": true,
   "baseline_ids": [
     "e63bc6c81d88e3327f657bc4",
     "dfc448216171e629b20e8c5a",
     "c4c1e41d8b62058571526ab4",
     "3b539193b85b606dcd1e043c"
   ],
-  "records": {
-    "3b539193b85b606dcd1e043c": {
+  "records": {},
+  "test_post_id": "3b539193b85b606dcd1e043c",
+  "failed_attempts": [
+    {
       "title": "Отражения",
       "status": "accepted",
       "created_at": "2026-11-08T21:23:07.465891+00:00",
       "buffer_post_id": "6af0e83e562f2e6de9e21eff",
-      "buffer_status": "error"
+      "buffer_status": "error",
+      "reason": "Buffer media issue; retry with validated 4:5 JPEG proxy"
     }
-  },
-  "test_post_id": "3b539193b85b606dcd1e043c"
+  ]
 }
