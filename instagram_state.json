@@ -18,8 +18,10 @@
     },
     "c4c1e41d8b62058571526ab4": {
       "title": "Дороги и мечты",
-      "status": "uncertain",
-      "created_at": "2026-11-08T22:22:37.078200+00:00"
+      "status": "accepted",
+      "created_at": "2026-11-08T22:22:37.078200+00:00",
+      "buffer_post_id": "6af0f62fd6bbae6fa115b2ed",
+      "buffer_status": "sent"
     }
   },
   "failed_attempts": [
