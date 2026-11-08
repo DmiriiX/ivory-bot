@@ -27,7 +27,7 @@ jobs:
           with urllib.request.urlopen(req, timeout=120) as resp:
               data = resp.read(8000001)
               assert resp.status == 200 and resp.headers.get("Content-Type","").startswith("image/jpeg")
-              assert data[:2] == b"\\xff\\xd8" and data[-2:] == b"\\xff\\xd9"
+              assert data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9"
           headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"], "Accept":"application/vnd.github+json", "Content-Type":"application/json", "User-Agent":"ivory-art-media-prep"}
           put = urllib.request.Request(github, data=json.dumps({
             "message":"Store stable Instagram artwork test image",
