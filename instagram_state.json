@@ -9,10 +9,12 @@
   "records": {
     "3b539193b85b606dcd1e043c": {
       "title": "Отражения",
-      "status": "accepted",
+      "status": "sent",
       "created_at": "2026-11-08T21:48:17.460812+00:00",
       "buffer_post_id": "6af0ee23562f2e6de9e3d52a",
-      "buffer_status": "sent"
+      "buffer_status": "sent",
+      "external_link": "https://www.instagram.com/p/DffwhSZIySB/",
+      "checked_at": "2026-11-08T21:49:16.118407+00:00"
     }
   },
   "test_post_id": "3b539193b85b606dcd1e043c",
