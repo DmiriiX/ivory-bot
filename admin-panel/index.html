@@ -13,7 +13,7 @@ button.active,button.primary{background:var(--ink);color:white;border-color:var(
 button:disabled{opacity:.45;cursor:not-allowed}.danger{color:#ac4537}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric,.panel,.post{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
 .metric strong{font:26px Georgia,serif;display:block}.metric span{font-size:12px;color:var(--muted)}
-.panel{margin:14px 0}.between{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.panel{margin:14px 0}.next-time{margin:13px 0 4px;border-top:1px solid var(--line);padding-top:12px}.next-time strong{display:block;font-size:16px;color:var(--ink)}.next-time small{display:block;color:var(--muted);font-size:12px}.countdown{font-variant-numeric:tabular-nums}.between{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .status{font-size:12px;padding:5px 10px;border-radius:12px;background:#ecece6;color:#45463e}
 .paused{background:#fff0dc;color:#865c1f}.filters{display:flex;gap:6px;overflow:auto;padding:0 0 10px;margin-top:16px}
 .filters button{white-space:nowrap}.post{display:flex;gap:13px;margin:10px 0;align-items:flex-start}
@@ -30,9 +30,9 @@ dialog{border:1px solid var(--line);border-radius:16px;padding:20px;width:min(92
 <h1>Управление публикациями</h1><p>Картины и факты об искусстве · Telegram, MAX и Instagram</p>
 <div class="tabs"><button class="active" data-kind="paintings">Картины</button><button data-kind="facts">Факты</button></div>
 <div id="error" role="alert"></div>
-<section class="panel"><div class="between"><div><h2>Instagram · @ivoryartgallery</h2><small>Автоматическая публикация через Buffer</small></div><span id="instagram-status" class="status">Проверка</span></div><p id="instagram-details">Статус подключения загружается…</p><button id="instagram-toggle" disabled>Загрузка…</button></section>
+<section class="panel"><div class="between"><div><h2>Instagram · @ivoryartgallery</h2><small>Автоматическая публикация через Buffer</small></div><span id="instagram-status" class="status">Проверка</span></div><p id="instagram-details">Статус подключения загружается…</p><div class="next-time"><small>Ближайшая проверка Instagram</small><strong id="instagram-next">Загрузка…</strong><small>Картина выходит после подтверждения публикации в Telegram и MAX. Время проверки не гарантирует выход поста.</small></div><button id="instagram-toggle" disabled>Загрузка…</button></section>
 <div class="metrics"><div class="metric"><strong id="total">-</strong><span>Всего</span></div><div class="metric"><strong id="published">-</strong><span>Использовано</span></div><div class="metric"><strong id="remaining">-</strong><span>В очереди</span></div></div>
-<section class="panel"><div class="between"><div><h2 id="heading">Картины</h2><small id="last">Последняя публикация: -</small></div><span id="status" class="status">Загрузка</span></div><div id="pending" style="display:none;color:#a43f35;margin-top:10px"></div>
+<section class="panel"><div class="between"><div><h2 id="heading">Картины</h2><small id="last">Последняя публикация: -</small></div><span id="status" class="status">Загрузка</span></div><div id="pending" style="display:none;color:#a43f35;margin-top:10px"></div><div class="next-time"><small>Следующая публикация · по Москве</small><strong id="next-post">Загрузка…</strong><small id="next-note">Расчётное время запуска, фактическая отправка может задержаться.</small></div>
 <div class="tools"><button id="toggle">Приостановить</button><button id="publish" class="primary">Опубликовать сейчас</button><button id="refresh">Обновить</button></div>
 <small style="color:#777">Публикация запускает GitHub Actions. Успех запуска не означает подтверждённую доставку.</small></section>
 <div class="between"><h2>Публикации</h2><small id="counter"></small></div>
@@ -43,17 +43,35 @@ dialog{border:1px solid var(--line);border-radius:16px;padding:20px;width:min(92
 <script>
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const init=tg?.initData||"";const $=id=>document.getElementById(id);
-const state={kind:"paintings",filter:"queue",data:null,edit:null};
+const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null};
 $("username").textContent=tg?.initDataUnsafe?.user?.first_name||"IVORY-ART";
 function err(message){$("error").textContent=message||""}
 async function api(path,body){const r=await fetch(path,{method:body===undefined?"GET":"POST",headers:{"X-Telegram-Init-Data":init,...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body)});const v=await r.json().catch(()=>({detail:"Ошибка ответа"}));if(!r.ok)throw new Error(typeof v.detail==="string"?v.detail:"HTTP "+r.status);return v}
 function text(el,value){el.textContent=value||""}
 function date(d){return d?new Date(d).toLocaleString("ru-RU",{timeZone:"Europe/Moscow"}):"нет"}
-async function checkInstagram(){try{const x=await api("/api/integrations/instagram");text($("instagram-status"),!x.connected?"Не подключён":x.enabled?"Активен":"На паузе");text($("instagram-details"),!x.connected?"Buffer: "+(x.error||"Нет подключения"): "Канал: "+x.name+" · Принято Buffer: "+(x.accepted||0)+" · Опубликовано: "+(x.sent||0)+" · Требует проверки: "+((x.uncertain||0)+(x.failed||0)));const btn=$("instagram-toggle");btn.disabled=!x.connected;btn.textContent=x.enabled?"Приостановить Instagram":"Включить Instagram";btn.onclick=async()=>{if(!confirm(x.enabled?"Приостановить автопубликации в Instagram?":"Включить автоматическую публикацию новых картин в Instagram?"))return;try{await api("/api/integrations/instagram/toggle",{enabled:!x.enabled});await checkInstagram()}catch(e){err(e.message)}}}catch(e){text($("instagram-status"),"Недоступен");text($("instagram-details"),"Не удалось проверить Instagram: "+e.message)}}
+function planned(slot){
+ if(!slot)return "Нет данных";
+ const reason=slot.reason;
+ if(reason==="paused")return "Автопубликация приостановлена";
+ if(reason==="empty")return "Очередь закончилась";
+ if(reason==="pending")return "Ожидается завершение предыдущего поста";
+ if(!slot.next_at)return "Время пока неизвестно";
+ const when=new Date(slot.next_at);
+ const dateStr=when.toLocaleString("ru-RU",{timeZone:"Europe/Moscow",day:"numeric",month:"long",weekday:"short",hour:"2-digit",minute:"2-digit"});
+ const minutes=Math.ceil((when.getTime()-Date.now())/60000);
+ if(minutes<=0)return dateStr+" · ожидается запуск";
+ const duration=minutes<60?"через "+minutes+" мин":minutes<1440?"через "+Math.floor(minutes/60)+" ч "+(minutes%60)+" мин":"";
+ return dateStr+" МСК"+(duration?" · "+duration:"");
+}
+function updateSchedules(){
+ if(state.data)text($("next-post"),planned(state.data.next_schedule));
+ if(state.instagram)text($("instagram-next"),planned(state.instagram.next_check));
+}
+async function checkInstagram(){try{const x=await api("/api/integrations/instagram");state.instagram=x;updateSchedules();text($("instagram-status"),!x.connected?"Не подключён":x.enabled?"Активен":"На паузе");text($("instagram-details"),!x.connected?"Buffer: "+(x.error||"Нет подключения"): "Канал: "+x.name+" · Принято Buffer: "+(x.accepted||0)+" · Опубликовано: "+(x.sent||0)+" · Требует проверки: "+((x.uncertain||0)+(x.failed||0)));const btn=$("instagram-toggle");btn.disabled=!x.connected;btn.textContent=x.enabled?"Приостановить Instagram":"Включить Instagram";btn.onclick=async()=>{if(!confirm(x.enabled?"Приостановить автопубликации в Instagram?":"Включить автоматическую публикацию новых картин в Instagram?"))return;try{await api("/api/integrations/instagram/toggle",{enabled:!x.enabled});await checkInstagram()}catch(e){err(e.message)}}}catch(e){text($("instagram-status"),"Недоступен");text($("instagram-details"),"Не удалось проверить Instagram: "+e.message)}}
 async function load(){err("");try{state.data=await api("/api/"+state.kind);render()}catch(e){err("Не удалось загрузить данные: "+e.message);$("list").replaceChildren()}}
 function button(label,handler){const b=document.createElement("button");b.textContent=label;b.onclick=handler;return b}
 async function action(path,body,confirmText){if(confirmText&&!confirm(confirmText))return;err("");try{await api("/api/"+state.kind+"/"+path,body);await load()}catch(e){err(e.message)}}
-function render(){const d=state.data;if(!d)return;["total","published","remaining"].forEach(x=>text($(x),String(d[x])));text($("heading"),state.kind==="paintings"?"Картины":"Факты");text($("last"),"Последняя запись: "+date(d.last_post_at));text($("status"),d.paused?"На паузе":"Активен");$("status").className="status"+(d.paused?" paused":"");$("toggle").textContent=d.paused?"Возобновить":"Приостановить";$("publish").disabled=d.paused||!!d.pending||d.remaining===0;
+function render(){const d=state.data;if(!d)return;updateSchedules();text($("next-note"),d.next_schedule?.reason==="scheduled"?"Плановое время GitHub Actions. Реальная публикация может задержаться.":"Расписание возобновится после устранения причины.");["total","published","remaining"].forEach(x=>text($(x),String(d[x])));text($("heading"),state.kind==="paintings"?"Картины":"Факты");text($("last"),"Последняя запись: "+date(d.last_post_at));text($("status"),d.paused?"На паузе":"Активен");$("status").className="status"+(d.paused?" paused":"");$("toggle").textContent=d.paused?"Возобновить":"Приостановить";$("publish").disabled=d.paused||!!d.pending||d.remaining===0;
 $("pending").style.display=d.pending?"block":"none";text($("pending"),d.pending?"Незавершённая отправка: проверьте Telegram и MAX перед следующей публикацией.":"");
 const set=d.posts.filter(p=>state.filter==="all"||state.filter==="used"&&p.used||state.filter==="excluded"&&p.excluded||state.filter==="queue"&&!p.used&&!p.excluded);
 text($("counter"),set.length+" записей");
@@ -74,5 +92,5 @@ $("toggle").onclick=()=>action("pause",{paused:!state.data.paused});
 $("publish").onclick=()=>action("publish",{},"Запустить реальную публикацию в Telegram и MAX? Эта операция может создать новый пост.");
 $("refresh").onclick=load;$("cancel").onclick=()=>$("editor").close();
 $("save").onclick=async()=>{const p=state.edit;if(!p)return;$("editor").close();await action("caption",{id:p.id,caption:$("edit-text").value})};
-load();checkInstagram();
+load();checkInstagram();setInterval(updateSchedules,60000);
 </script></body></html>
