@@ -106,7 +106,7 @@ def post_caption(post):
     raw = html.unescape(re.sub(r"<[^>]*>", "", str(post.get("caption") or "")))
 
     # Extract media and dimensions only when they are present in source data.
-    dimensions = re.search(r"(\\d{1,4})\\s*[×xхХ]\\s*(\\d{1,4})\\s*см", raw, re.IGNORECASE)
+    dimensions = re.search(r"(\d{1,4})\s*[×xхХ]\s*(\d{1,4})\s*см", raw, re.IGNORECASE)
     dims_en = (f"{dimensions.group(1)} × {dimensions.group(2)} cm" if dimensions else "")
     dims_ru = (f"{dimensions.group(1)} × {dimensions.group(2)} см" if dimensions else "")
     source = raw.casefold()
@@ -152,8 +152,8 @@ def post_caption(post):
         tags_en, "#russianart",
         "#картины", "#искусство", "#художники", tags_ru, "#галереякартин",
     ])
-    return ("\\n".join(english) + "\\n\\n" + "\\n".join(russian)
-            + "\\n\\n" + tags).strip()[:2100]
+    return ("\n".join(english) + "\n\n" + "\n".join(russian)
+            + "\n\n" + tags).strip()[:2100]
 
 async def ensure_public_image(post, item_id, github_api):
     """Commit an image to public GitHub storage before Buffer reads it."""
