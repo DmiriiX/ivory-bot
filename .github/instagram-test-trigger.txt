@@ -1,0 +1,3 @@
+One-time Instagram-only validation for painting 'Отражения' by Дмитрий Котунов.
+The target id and no-repeat record are stored in instagram_state.json.
+Telegram and MAX must not be invoked.
