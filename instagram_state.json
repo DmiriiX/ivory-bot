@@ -1,19 +1,12 @@
 {
-  "enabled": false,
+  "enabled": true,
   "baseline_ids": [
     "e63bc6c81d88e3327f657bc4",
     "dfc448216171e629b20e8c5a",
     "c4c1e41d8b62058571526ab4",
     "3b539193b85b606dcd1e043c"
   ],
-  "records": {
-    "3b539193b85b606dcd1e043c": {
-      "title": "Отражения",
-      "status": "failed",
-      "created_at": "2026-11-08T21:33:58.559069+00:00",
-      "error": "Invalid post: Image could not be read from its URL."
-    }
-  },
+  "records": {},
   "test_post_id": "3b539193b85b606dcd1e043c",
   "failed_attempts": [
     {
@@ -23,6 +16,13 @@
       "buffer_post_id": "6af0e83e562f2e6de9e21eff",
       "buffer_status": "error",
       "reason": "Buffer media issue; retry with validated 4:5 JPEG proxy"
+    },
+    {
+      "title": "Отражения",
+      "status": "failed",
+      "created_at": "2026-11-08T21:33:58.559069+00:00",
+      "error": "Invalid post: Image could not be read from its URL.",
+      "reason": "Second attempt: Buffer could not read Render-hosted URL; fixed by static GitHub JPEG"
     }
   ]
 }
