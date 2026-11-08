@@ -14,11 +14,11 @@ from typing import Literal
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
-from media import normalized_image
 import re
 from pydantic import BaseModel, Field
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
+from media import normalized_image
 from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
