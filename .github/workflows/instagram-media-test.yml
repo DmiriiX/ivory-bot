@@ -1,0 +1,28 @@
+name: Validate public Instagram image
+on:
+  push:
+    paths:
+      - ".github/instagram-media-trigger.txt"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check image available to external clients
+        run: |
+          python3 - <<'PY'
+          import urllib.request
+          u="https://ivory-bot-h4gn.onrender.com/instagram-image/3b539193b85b606dcd1e043c.jpg"
+          request=urllib.request.Request(u,headers={"User-Agent":"Mozilla/5.0 (IvoryArtMediaCheck)"})
+          with urllib.request.urlopen(request,timeout=90) as response:
+              content_type=response.headers.get("Content-Type","")
+              data=response.read(9000001)
+              print("HTTP",response.status,"content-type",content_type,"bytes",len(data))
+              assert response.status==200
+              assert "image/jpeg" in content_type
+              assert data[:2]==b"\xff\xd8" and data[-2:]==b"\xff\xd9"
+              assert 1000 < len(data) < 9000000
+          print("Image validated: JPEG is publicly accessible")
+          PY
