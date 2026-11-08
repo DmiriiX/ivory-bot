@@ -9,8 +9,9 @@
   "records": {
     "3b539193b85b606dcd1e043c": {
       "title": "Отражения",
-      "status": "uncertain",
-      "created_at": "2026-11-08T21:33:58.559069+00:00"
+      "status": "failed",
+      "created_at": "2026-11-08T21:33:58.559069+00:00",
+      "error": "Invalid post: Image could not be read from its URL."
     }
   },
   "test_post_id": "3b539193b85b606dcd1e043c",
