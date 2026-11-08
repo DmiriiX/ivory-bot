@@ -21,9 +21,35 @@ class InstagramSafetyTests(unittest.TestCase):
             "artist": "Artist",
             "caption": "🎨 <b>Art</b> &amp; sculpture",
         })
-        self.assertIn("Art & sculpture", msg)
+        self.assertTrue(msg.startswith('🎨 "Original Artwork"'))
         self.assertNotIn("<b>", msg)
         self.assertIn("ivory-art.com", msg)
+        self.assertIn("#artgallery", msg)
+        self.assertIn("#картины", msg)
+
+    def test_english_before_russian_on_existing_catalog_artwork(self):
+        msg = instagram.post_caption({
+            "title": "Отражения",
+            "artist": "Котунов Дмитрий",
+            "caption": "🎨 <b>Отражения</b>\\nКотунов Дмитрий\\n\\nхолст, масло · 30 × 40 см",
+        })
+        self.assertTrue(msg.startswith('🎨 "Reflections"'))
+        self.assertIn("Artist: Dmitry Kotunov", msg)
+        self.assertIn("Oil on canvas · 30 × 40 cm", msg)
+        self.assertIn("🇷🇺 «Отражения»", msg)
+        self.assertIn("Холст, масло · 30 × 40 см", msg)
+        self.assertLess(msg.index('🎨 "Reflections"'), msg.index("🇷🇺"))
+        self.assertIn("#oilpainting", msg)
+        self.assertIn("#живописьмаслом", msg)
+        self.assertLess(len(msg), 2200)
+
+    def test_curated_translations_cover_every_catalog_item(self):
+        import json
+        from instagram_translations import TITLES, ARTISTS
+        posts = json.loads((HERE.parent / "posts.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(posts), 50)
+        self.assertTrue(all(p["title"] in TITLES for p in posts))
+        self.assertTrue(all(p["artist"] in ARTISTS for p in posts))
 
     def test_non_https_photo_rejected_before_network(self):
         import asyncio
