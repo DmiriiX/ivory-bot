@@ -3,9 +3,6 @@ on:
   schedule:
     - cron: "20 5 * * *"
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/instagram-gallery-test-trigger.txt"
 
 permissions:
   contents: write
@@ -24,15 +21,11 @@ jobs:
       - name: Install media preparation tools
         run: |
           python3 -m pip install -r admin-panel/requirements.txt
-      - name: Inspect public Tilda store configuration
-        run: python3 scripts/inspect_tilda_store.py
       - name: Install FFmpeg for Reel rendering
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       - name: Generate a small batch of media
-        env:
-          IVORY_MEDIA_DEBUG: '1'
         run: python3 scripts/prepare_instagram_assets.py --limit 3
       - name: Store stable assets without triggering publisher workflows
         run: |
