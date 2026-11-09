@@ -18,7 +18,7 @@ from PIL import Image, ImageOps
 from media import normalized_image
 
 REEL_SIZE = (720, 1280)
-FPS = 15
+FPS = 30
 
 
 def frame_image(image_bytes):
@@ -82,7 +82,7 @@ def encode_reel(files, output):
     filters = []
     for i in range(count):
         filters.append(
-            f"[{i}:v]zoompan=z='min(zoom+0.0007,1.075)':d=45:s=720x1280:fps=15,"
+            f"[{i}:v]zoompan=z='min(zoom+0.0007,1.075)':d=90:s=720x1280:fps=30,"
             f"trim=duration=3,setpts=PTS-STARTPTS[v{i}]"
         )
     filters.append("".join(f"[v{i}]" for i in range(count)) +
