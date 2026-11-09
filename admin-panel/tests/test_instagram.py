@@ -93,6 +93,24 @@ class InstagramSafetyTests(unittest.TestCase):
             self.assertNotIn("stickerFields", sent["metadata"]["instagram"])
         asyncio.run(test())
 
+    def test_new_triptych_story_urls_are_valid_buffer_assets(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+        async def trial():
+            base = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
+            result = {"createPost": {"post": {"id": "story2", "status": "sending"}}}
+            sender = AsyncMock(return_value=result)
+            with patch.object(instagram, "graphql", new=sender):
+                await instagram.create_buffer_post(
+                    "channel", {"photo": "https://static.tildacdn.com/a.jpg"},
+                    None, media={"story": base + "painting-story-2.jpg"}, kind="story")
+            payload = sender.call_args.args[1]["input"]
+            self.assertEqual(payload["assets"][0]["image"]["url"],
+                             base + "painting-story-2.jpg")
+            self.assertEqual(payload["metadata"]["instagram"]["type"], "story")
+            self.assertFalse(payload["metadata"]["instagram"]["shouldShareToFeed"])
+        asyncio.run(trial())
+
     def test_non_https_photo_rejected_before_network(self):
         import asyncio
         async def trial():
