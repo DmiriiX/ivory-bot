@@ -20,7 +20,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
 from schedule_info import next_post, next_instagram_check, next_instagram_publication
-from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts
+from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -352,6 +352,9 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
             "enabled": bool(history.get("enabled")),
             "next_check": next_instagram_check(enabled=bool(history.get("enabled"))),
             "next_publication": next_instagram_publication(history),
+            "metrics_last_checked": None,
+            "metrics_posts": [],
+
             "already_published_before_connection": len(history.get("baseline_ids") or []),
             "accepted": sum(v.get("status") in ("accepted", "sent") for v in entries.values()),
             "sent": sum(v.get("status") == "sent" for v in entries.values()),
@@ -360,6 +363,19 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
         })
     except Exception:
         status["enabled"] = False
+    try:
+        metrics, _ = await read_file("paintings", "instagram_metrics.json")
+        status["metrics_last_checked"] = metrics.get("checked_at")
+        status["metrics_posts"] = [
+            {"title": rec.get("title"), "external_link": rec.get("external_link"),
+             "metrics": (metrics.get("posts") or {}).get(post_id, {}).get("metrics", {}),
+             "metrics_updated_at": (metrics.get("posts") or {}).get(post_id, {}).get("metrics_updated_at"),
+             "error": (metrics.get("posts") or {}).get(post_id, {}).get("error")}
+            for post_id, rec in (history.get("records") or {}).items()
+            if rec.get("status") in ("sent", "accepted")
+        ]
+    except Exception:
+        pass
     return status
 
 
@@ -389,6 +405,29 @@ async def instagram_sync(request: Request, authorization: str = Header(default="
         raise HTTPException(401, "Signed GitHub OIDC token required")
     await verify_github_oidc(authorization[7:])
     return await sync_instagram(read_file, update_file, identity, gh)
+
+
+@app.post("/internal/instagram/metrics")
+async def instagram_metrics_sync(authorization: str = Header(default="")):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Signed GitHub OIDC token required")
+    await verify_github_oidc(
+        authorization[7:],
+        workflow="DmiriiX/ivory-bot/.github/workflows/instagram-metrics.yml@refs/heads/main")
+    history, _ = await read_file("paintings", "instagram_state.json")
+    records = history.get("records") or {}
+    results = await collect_post_metrics(records)
+    if results and not any("error" not in record for record in results.values()):
+        # Preserve last successful snapshot if the experimental API is unavailable.
+        return {"ok": False, "reason": "Buffer metrics unavailable", "errors": len(results)}
+    from datetime import datetime, timezone
+    existing, sha = await read_file("paintings", "instagram_metrics.json")
+    existing["checked_at"] = datetime.now(timezone.utc).isoformat()
+    existing["posts"] = results
+    await update_file("paintings", "instagram_metrics.json", existing, sha,
+                      "Update daily Instagram metrics snapshot [skip ci]")
+    return {"ok": True, "posts": len(results),
+            "with_metrics": sum(bool(p.get("metrics")) for p in results.values())}
 
 
 @app.on_event("startup")
