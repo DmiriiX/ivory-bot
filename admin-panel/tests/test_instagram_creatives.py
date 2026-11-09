@@ -42,6 +42,14 @@ class CreativeSafetyTests(unittest.TestCase):
         self.assertEqual(f2.size, (720, 1280))
         self.assertNotEqual(f1.tobytes(), f2.tobytes())
 
+    def test_cinematic_and_luxury_music_are_not_identical(self):
+        with tempfile.TemporaryDirectory() as folder:
+            a = Path(folder)/"a.wav"
+            b = Path(folder)/"b.wav"
+            original_ambient_audio(a, 2.5, "cinematic")
+            original_ambient_audio(b, 2.5, "luxury")
+            self.assertNotEqual(a.read_bytes(), b.read_bytes())
+
     def test_original_ambient_soundtrack_contains_audio(self):
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / "ambient.wav"
