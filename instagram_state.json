@@ -54,8 +54,8 @@
   "rich_media_enabled": true,
   "campaign": {
     "enabled": true,
-    "start_date": "2026-11-10",
-    "end_date": "2026-12-09",
+    "start_date": "2026-11-09",
+    "end_date": "2026-12-08",
     "feed_days": [
       "tuesday",
       "thursday",
@@ -71,7 +71,8 @@
     "story_time_msk": "19:15",
     "target_feed_per_week": 4,
     "paid_ads": false,
-    "music": "original ambient instrumentals embedded in Reels"
+    "music": "original ambient instrumentals embedded in Reels",
+    "first_week_kickoff": "Monday November 9 replaces Tuesday November 10, preserving four feed posts first week"
   },
   "story_records": {}
 }
