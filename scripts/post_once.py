@@ -35,10 +35,10 @@ def artwork_url(post):
         return post.get("public_link") or post.get("link") or "https://ivory-art.com/catalog"
     for field in ("link", "public_link"):
         value = post.get(field) or ""
-        match = re.search(r"/(?:shop/)?tproduct/\\d+-(\\d{9,15})-", value)
+        match = re.search(r"/(?:shop/)?tproduct/\d+-(\d{9,15})-", value)
         if match:
             return "https://ivory-art.com/#ia-product-" + match.group(1)
-        match = re.fullmatch(r"https://(?:www\\.)?ivory-art\\.com/#ia-product-(\\d{9,15})", value)
+        match = re.fullmatch(r"https://(?:www\.)?ivory-art\.com/#ia-product-(\d{9,15})", value)
         if match:
             return "https://ivory-art.com/#ia-product-" + match.group(1)
     raise ValueError("Painting is missing a valid product ID; refuse broken link")
