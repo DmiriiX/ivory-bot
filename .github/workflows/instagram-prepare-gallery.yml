@@ -26,6 +26,10 @@ jobs:
           python3 -m pip install -r admin-panel/requirements.txt
       - name: Inspect public Tilda store configuration
         run: python3 scripts/inspect_tilda_store.py
+      - name: Install FFmpeg for Reel rendering
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
       - name: Generate a small batch of media
         env:
           IVORY_MEDIA_DEBUG: '1'
