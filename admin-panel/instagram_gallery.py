@@ -206,6 +206,9 @@ async def load_catalog_galleries():
                     galleries[uid] = gallery[:MAX_IMAGES]
             if not result.get("nextslice"):
                 break
+    if __import__("os").environ.get("IVORY_MEDIA_DEBUG") == "1":
+        print("Tilda catalog: entries", len(galleries),
+              "multi-photo", sum(len(v) > 1 for v in galleries.values()))
     if galleries:
         _CATALOG_CACHE.update({"at": time.monotonic(), "galleries": galleries})
     return galleries
