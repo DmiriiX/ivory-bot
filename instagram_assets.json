@@ -1,4 +1,36 @@
 {
   "version": 1,
-  "artworks": {}
+  "artworks": {
+    "28b174020ec70c69d3a66050": {
+      "title": "Голубые полоски",
+      "image_count": 3,
+      "gallery_source": "tilda_catalog",
+      "images": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-3.jpg"
+      ],
+      "reel": null
+    },
+    "275a9c705656a9ce36125907": {
+      "title": "Энергия моря - 24х39",
+      "image_count": 2,
+      "gallery_source": "tilda_catalog",
+      "images": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-2.jpg"
+      ],
+      "reel": null
+    },
+    "877c981e3b8d2d4d44e2d1c1": {
+      "title": "Жаркое лето",
+      "image_count": 2,
+      "gallery_source": "tilda_catalog",
+      "images": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-2.jpg"
+      ],
+      "reel": null
+    }
+  }
 }
