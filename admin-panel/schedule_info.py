@@ -88,7 +88,7 @@ def next_instagram_publication(history, now=None):
             latest = max(latest, stamp.astimezone(MSK)) if latest else stamp.astimezone(MSK)
         except (KeyError, TypeError, ValueError):
             continue
-    earliest = latest.date() + timedelta(days=3) if latest else now.date()
+    earliest = latest.date() + timedelta(days=2) if latest else now.date()
     for offset in range(120):
         day = max(now.date(), earliest) + timedelta(days=offset)
         slot = datetime.combine(day, time(18, 15), tzinfo=MSK)
