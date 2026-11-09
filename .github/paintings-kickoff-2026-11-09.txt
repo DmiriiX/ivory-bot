@@ -1,1 +1,2 @@
 One-time guarded production kickoff for Ivory Art Telegram + MAX paintings, Moscow 2026-11-09
+Retry MAX only using persisted pending state; Telegram already sent
