@@ -20,7 +20,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
 from instagram_gallery import discover_gallery, format_for_gallery
-from instagram_reel import make_reel
+from instagram_editorial import make_editorial_reel
 from schedule_info import next_post, next_instagram_check, next_instagram_publication, next_instagram_story
 from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story
 
@@ -466,12 +466,16 @@ async def instagram_preview(artwork_id: str, x_telegram_init_data: str = Header(
 
 
 @app.get("/api/integrations/instagram/preview/{artwork_id}/reel")
-async def instagram_reel_preview(artwork_id: str, x_telegram_init_data: str = Header(default="")):
+async def instagram_reel_preview(artwork_id: str, style: Literal["cinematic", "luxury"] = "cinematic",
+                                 x_telegram_init_data: str = Header(default="")):
     authenticate(x_telegram_init_data)
     post = await instagram_artwork(artwork_id)
     images, _ = await discover_gallery(post)
+    from instagram_translations import TITLES, ARTISTS
     try:
-        video = await make_reel(images[:4])
+        video = await make_editorial_reel(
+            images[:2], TITLES.get(post.get("title"), post.get("title") or "Original Artwork"),
+            ARTISTS.get(post.get("artist"), post.get("artist") or "IVORY ART"), style)
     except Exception as exc:
         print("Reel preview failed", type(exc).__name__)
         raise HTTPException(502, "Reel preview unavailable") from exc
