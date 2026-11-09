@@ -313,37 +313,56 @@ async def sync_instagram(read_file, update_file, identity, github_api):
                     record["status"] = remote["status"]
                     record["external_link"] = remote.get("externalLink")
                     record["checked_at"] = datetime.now(timezone.utc).isoformat()
-                    await update_file("paintings", "instagram_state.json", state, sha, "Update Instagram delivery status")
-                    return {"ok": True, "checked": item_id, "status": record["status"]}
+                    latest = await update_file("paintings", "instagram_state.json", state, sha, "Update Instagram delivery status")
+                    sha = (latest.get("content") or {}).get("sha") or (await read_file("paintings", "instagram_state.json"))[1]
             except Exception:
                 pass
     # Don't start a second submission if one is uncertain.
     if any(v.get("status") == "uncertain" for v in records.values()):
         return {"ok": False, "reason": "Uncertain delivery requires manual review"}
-    # Restrict Instagram to a single evening slot every 2 calendar days.
-    # Telegram and MAX retain their independent schedule.
+    campaign = state.get("campaign") or {}
+    in_campaign = bool(campaign.get("enabled"))
     now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
-    today_slot = next_instagram_publication(
-        state, now=now_msk.replace(hour=18, minute=14, second=0, microsecond=0))
-    if (now_msk.hour != 18 or now_msk.minute < 15
-            or not today_slot.get("next_at")
-            or datetime.fromisoformat(today_slot["next_at"]).date() != now_msk.date()):
-        return {"ok": True, "reason": "Instagram cadence: next publishing slot",
-                "next_publication": next_instagram_publication(state)}
-    # A one-time admin-approved test may reuse one historically sent painting on Instagram,
-    # but only when its ID is explicitly present in the state and no Instagram record exists.
+    if in_campaign:
+        if not due_now(campaign, "feed", now_msk):
+            return {"ok": True, "reason": "No campaign feed slot today",
+                    "next_publication": next_instagram_publication(state)}
+        if any((rec.get("campaign_date") == now_msk.date().isoformat())
+               for rec in records.values()):
+            return {"ok": True, "reason": "Feed slot already reserved today"}
+    else:
+        today_slot = next_instagram_publication(
+            state, now=now_msk.replace(hour=18, minute=14, second=0, microsecond=0))
+        if (now_msk.hour != 18 or now_msk.minute < 15
+                or not today_slot.get("next_at")
+                or datetime.fromisoformat(today_slot["next_at"]).date() != now_msk.date()):
+            return {"ok": True, "reason": "Instagram cadence: next publishing slot",
+                    "next_publication": next_instagram_publication(state)}
     one_shot_id = state.get("test_post_id")
     test_candidate = next((p for p in posts if identity("paintings", p) == one_shot_id
                            and one_shot_id in used and one_shot_id not in records), None)
-    new = test_candidate or next((p for p in posts if identity("paintings", p) in used and
-                identity("paintings", p) not in ignored and identity("paintings", p) not in records), None)
+    available = {k: v for k, v in (rich_index.get("artworks") or {}).items()
+                 if len(v.get("images") or []) >= 2}
+    if in_campaign:
+        # Prioritize fully prepared media, then never-before-posted single images.
+        new = next((p for p in posts if identity("paintings", p) in available
+                    and identity("paintings", p) not in records
+                    and identity("paintings", p) not in ignored), None)
+        if not new:
+            new = next((p for p in posts if identity("paintings", p) not in records
+                        and identity("paintings", p) not in ignored), None)
+    else:
+        new = test_candidate or next((p for p in posts if identity("paintings", p) in used and
+                    identity("paintings", p) not in ignored and identity("paintings", p) not in records), None)
     if not new:
-        return {"ok": True, "reason": "No new confirmed painting to sync"}
+        return {"ok": True, "reason": "No eligible artwork to publish"}
     item_id = identity("paintings", new)
     # Write intent before network request; ambiguous failures never duplicate automatically.
     records[item_id] = {
         "title": new.get("title"), "status": "uncertain",
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "campaign": in_campaign,
+        "campaign_date": now_msk.date().isoformat() if in_campaign else None,
     }
     updated = await update_file("paintings", "instagram_state.json", state, sha, "Reserve artwork for Instagram, prevent duplicates")
     new_sha = updated.get("content", {}).get("sha")
@@ -353,9 +372,14 @@ async def sync_instagram(read_file, update_file, identity, github_api):
         prepared = (rich_index.get("artworks") or {}).get(item_id)
         chosen = "post"
         if prepared and prepared.get("image_count", 0) >= 2:
-            # Rotate without reposting the same artwork in multiple formats.
-            rich_count = sum(1 for rec in records.values() if rec.get("format") in ("carousel", "reel"))
-            chosen = "reel" if rich_count % 3 == 2 and prepared.get("reel") else "carousel"
+            if in_campaign:
+                available_formats = {"carousel"}
+                if prepared.get("reel"):
+                    available_formats.add("reel")
+                chosen = feed_format(records, available_formats)
+            else:
+                rich_count = sum(1 for rec in records.values() if rec.get("format") in ("carousel", "reel"))
+                chosen = "reel" if rich_count % 3 == 2 and prepared.get("reel") else "carousel"
             if not await prepared_media_ready(prepared, chosen):
                 chosen = "post"
         image_url = None
