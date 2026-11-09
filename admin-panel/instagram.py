@@ -269,7 +269,7 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     # Don't start a second submission if one is uncertain.
     if any(v.get("status") == "uncertain" for v in records.values()):
         return {"ok": False, "reason": "Uncertain delivery requires manual review"}
-    # Restrict Instagram to a single evening slot every 3 calendar days.
+    # Restrict Instagram to a single evening slot every 2 calendar days.
     # Telegram and MAX retain their independent schedule.
     now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
     today_slot = next_instagram_publication(
