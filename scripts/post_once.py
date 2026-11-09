@@ -25,6 +25,25 @@ def key(post):
     value = ("fact:" + str(post.get("id") or post.get("title"))) if FACTS else ("painting:" + str(post.get("link") or post.get("title")))
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
 
+def artwork_url(post):
+    """New Ivory Art product modal URL. Keep legacy link for immutable post IDs.
+
+    Product hash links route through the current storefront rather than a
+    deprecated Tilda shop/tproduct page. Facts retain their own links.
+    """
+    if FACTS:
+        return post.get("public_link") or post.get("link") or "https://ivory-art.com/catalog"
+    for field in ("link", "public_link"):
+        value = post.get(field) or ""
+        match = re.search(r"/(?:shop/)?tproduct/\\d+-(\\d{9,15})-", value)
+        if match:
+            return "https://ivory-art.com/#ia-product-" + match.group(1)
+        match = re.fullmatch(r"https://(?:www\\.)?ivory-art\\.com/#ia-product-(\\d{9,15})", value)
+        if match:
+            return "https://ivory-art.com/#ia-product-" + match.group(1)
+    raise ValueError("Painting is missing a valid product ID; refuse broken link")
+
+
 def save(state):
     tmp = STATE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -78,7 +97,7 @@ def multipart(url, fields, image):
 def telegram(post, image):
     token = os.environ["BOT_TOKEN"]
     channel = os.environ["CHANNEL_ID"]
-    button = {"inline_keyboard": [[{"text": BUTTON, "url": post.get("public_link") or post.get("link") or "https://ivory-art.com/catalog"}]]}
+    button = {"inline_keyboard": [[{"text": BUTTON, "url": artwork_url(post)}]]}
     caption = (post.get("caption") or post.get("text") or post.get("title") or "")
     api = "https://api.telegram.org/bot" + token + "/"
     if image:
@@ -116,7 +135,7 @@ def max_send(post, image):
         attachments.append({"type": "image", "payload": {"token": max_upload(image)}})
     elif not FACTS:
         return {}, False
-    attachments.append({"type": "inline_keyboard", "payload": {"buttons": [[{"type": "link", "text": BUTTON, "url": post.get("public_link") or post.get("link") or "https://ivory-art.com/catalog"}]]}})
+    attachments.append({"type": "inline_keyboard", "payload": {"buttons": [[{"type": "link", "text": BUTTON, "url": artwork_url(post)}]]}})
     text = html.unescape(re.sub(r"<[^>]*>", "", post.get("caption") or post.get("text") or post.get("title") or ""))[:4000]
     url = "https://platform-api2.max.ru/messages?chat_id=" + urllib.parse.quote(os.environ["MAX_CHANNEL_ID"], safe="")
     return call(url, {"text": text, "attachments": attachments, "notify": True}, {"Authorization": os.environ["MAX_BOT_TOKEN"]})
