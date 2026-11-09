@@ -112,6 +112,13 @@ async def discover_gallery(post):
     manual = [x for x in manual if x]
     if manual:
         return list(dict.fromkeys([primary] + manual))[:MAX_IMAGES], "catalog"
+    try:
+        catalog_images = await catalog_gallery(post)
+        if catalog_images:
+            return list(dict.fromkeys([primary] + catalog_images))[:MAX_IMAGES], "tilda_catalog"
+    except (httpx.HTTPError, ValueError, TypeError) as exc:
+        if __import__("os").environ.get("IVORY_MEDIA_DEBUG") == "1":
+            print("Tilda catalog fallback:", type(exc).__name__)
     candidates = []
     for key in ("public_link", "link"):
         try:
@@ -144,6 +151,71 @@ async def discover_gallery(post):
         except (httpx.HTTPError, ValueError):
             continue
     return [primary], "primary_only"
+
+
+# Verified from the published Ivory Art homepage store widget (2026-11-09).
+STORE_PART_UID = "321076440131"
+STORE_REC_ID = "467407679"
+CATALOG_ENDPOINT = "https://store.tildaapi.com/api/getproductslist/"
+_CATALOG_CACHE = {"at": 0.0, "galleries": {}}
+
+
+def product_uid(post):
+    for key in ("public_link", "link"):
+        m = re.search(r"/tproduct/\d+-(\d{9,15})-", post.get(key) or "")
+        if m:
+            return m.group(1)
+    return None
+
+
+async def load_catalog_galleries():
+    """Read Tilda public store catalog, bounded pagination and 15-min cache."""
+    import time
+    if time.monotonic() - _CATALOG_CACHE["at"] < 900:
+        return _CATALOG_CACHE["galleries"]
+    galleries = {}
+    async with httpx.AsyncClient(timeout=25, follow_redirects=False) as client:
+        for page in range(1, 16):
+            response = await client.get(CATALOG_ENDPOINT, params={
+                "storepartuid": STORE_PART_UID,
+                "recid": STORE_REC_ID,
+                "getparts": "false",
+                "getoptions": "true",
+                "size": "100",
+                "slice": str(page),
+                "sort[created]": "desc",
+            }, headers={"User-Agent": "Mozilla/5.0"})
+            response.raise_for_status()
+            if len(response.content) > 4_000_000:
+                raise ValueError("Catalog response too large")
+            result = response.json()
+            for product in result.get("products") or []:
+                uid = str(product.get("uid") or "")
+                try:
+                    raw = product.get("gallery") or "[]"
+                    images = json.loads(raw) if isinstance(raw, str) else raw
+                except (ValueError, TypeError):
+                    images = []
+                gallery = []
+                for item in images if isinstance(images, list) else []:
+                    url = item.get("img") if isinstance(item, dict) else item
+                    approved = approved_image_url(url)
+                    if approved and approved not in gallery:
+                        gallery.append(approved)
+                if uid and gallery:
+                    galleries[uid] = gallery[:MAX_IMAGES]
+            if not result.get("nextslice"):
+                break
+    if galleries:
+        _CATALOG_CACHE.update({"at": time.monotonic(), "galleries": galleries})
+    return galleries
+
+
+async def catalog_gallery(post):
+    uid = product_uid(post)
+    if not uid:
+        return []
+    return (await load_catalog_galleries()).get(uid, [])
 
 
 def format_for_gallery(images):
