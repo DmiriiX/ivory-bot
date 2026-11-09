@@ -128,7 +128,10 @@ async def gh(method, kind, path="", body=None, params=None):
 
 async def read_file(kind, path):
     import base64
-    result = await gh("GET", kind, "contents/" + path, params={"ref": "main"})
+    # Keep Instagram runtime state on a separate branch, so data updates
+    # cannot redeploy Render and terminate an in-flight Buffer request.
+    ref = "instagram-runtime-state" if kind == "paintings" and path == "instagram_state.json" else "main"
+    result = await gh("GET", kind, "contents/" + path, params={"ref": ref})
     if result.get("type") != "file":
         raise HTTPException(502, "Unexpected GitHub file type")
     return json.loads(base64.b64decode(result["content"]).decode("utf-8")), result["sha"]
@@ -136,12 +139,13 @@ async def read_file(kind, path):
 
 async def update_file(kind, path, data, sha, message):
     import base64
+    ref = "instagram-runtime-state" if kind == "paintings" and path == "instagram_state.json" else "main"
     content = (json.dumps(data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     return await gh("PUT", kind, "contents/" + path, body={
         "message": message,
         "content": base64.b64encode(content).decode("ascii"),
         "sha": sha,
-        "branch": "main",
+        "branch": ref,
     })
 
 
