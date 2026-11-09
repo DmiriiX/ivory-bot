@@ -19,6 +19,8 @@ from pydantic import BaseModel, Field
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
+from instagram_gallery import discover_gallery, format_for_gallery
+from instagram_reel import make_reel
 from schedule_info import next_post, next_instagram_check, next_instagram_publication
 from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics
 
@@ -403,6 +405,59 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
     except Exception:
         pass
     return status
+
+
+async def instagram_artwork(artwork_id: str):
+    if not re.fullmatch(r"[0-9a-f]{24}", artwork_id):
+        raise HTTPException(404, "Invalid artwork")
+    posts, _ = await read_file("paintings", "posts.json")
+    post = next((p for p in posts if identity("paintings", p) == artwork_id), None)
+    if not post:
+        raise HTTPException(404, "Artwork not found")
+    return post
+
+
+@app.get("/api/integrations/instagram/artworks")
+async def instagram_artworks(x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    posts, _ = await read_file("paintings", "posts.json")
+    history, _ = await read_file("paintings", "instagram_state.json")
+    recorded = history.get("records") or {}
+    return {"automatic_multi_image_enabled": False,
+            "note": "Reels/carousels are previews only; existing single-image automation remains unchanged",
+            "artworks": [
+                {"id": identity("paintings", p), "title": p.get("title"),
+                 "artist": p.get("artist"), "photo": p.get("photo"),
+                 "published_to_instagram": identity("paintings", p) in recorded}
+                for p in posts
+            ]}
+
+
+@app.get("/api/integrations/instagram/preview/{artwork_id}")
+async def instagram_preview(artwork_id: str, x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    post = await instagram_artwork(artwork_id)
+    images, source = await discover_gallery(post)
+    return {"id": artwork_id, "title": post.get("title"), "artist": post.get("artist"),
+            "images": images, "image_count": len(images),
+            "recommended_format": format_for_gallery(images),
+            "reel_available": bool(images), "gallery_source": source,
+            "draft_only": True,
+            "note": "Не является публикацией. Дополнительные фото только из проверенной галереи товара."}
+
+
+@app.get("/api/integrations/instagram/preview/{artwork_id}/reel")
+async def instagram_reel_preview(artwork_id: str, x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    post = await instagram_artwork(artwork_id)
+    images, _ = await discover_gallery(post)
+    try:
+        video = await make_reel(images[:4])
+    except Exception as exc:
+        print("Reel preview failed", type(exc).__name__)
+        raise HTTPException(502, "Reel preview unavailable") from exc
+    return Response(video, media_type="video/mp4",
+                    headers={"Cache-Control": "no-store", "Content-Disposition": "inline; filename=ivory-preview.mp4"})
 
 
 class InstagramSwitch(BaseModel):
