@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
-from schedule_info import next_post, next_instagram_check
+from schedule_info import next_post, next_instagram_check, next_instagram_publication
 from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
@@ -351,6 +351,7 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
         status.update({
             "enabled": bool(history.get("enabled")),
             "next_check": next_instagram_check(enabled=bool(history.get("enabled"))),
+            "next_publication": next_instagram_publication(history),
             "already_published_before_connection": len(history.get("baseline_ids") or []),
             "accepted": sum(v.get("status") in ("accepted", "sent") for v in entries.values()),
             "sent": sum(v.get("status") == "sent" for v in entries.values()),
