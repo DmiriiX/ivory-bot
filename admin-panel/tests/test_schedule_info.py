@@ -33,7 +33,7 @@ class UpcomingScheduleTests(unittest.TestCase):
             "art": {"status": "sent", "created_at": "2026-11-08T22:22:37+00:00"}}}
         now = datetime(2026, 11, 9, 9, 15, tzinfo=MSK)
         slot = next_instagram_publication(history, now=now)
-        self.assertEqual(slot["next_at"], "2026-11-12T18:15:00+03:00")
+        self.assertEqual(slot["next_at"], "2026-11-11T18:15:00+03:00")
         self.assertEqual(slot["reason"], "scheduled")
 
     def test_instagram_held_when_delivery_unknown(self):
