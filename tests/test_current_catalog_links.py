@@ -12,13 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CurrentCatalogLinksTests(unittest.TestCase):
-    def test_all_fifty_have_validated_new_catalog_links(self):
+    def test_all_fifty_have_validated_homepage_hash_links(self):
         posts = json.loads((ROOT / "posts.json").read_text(encoding="utf-8"))
         self.assertEqual(len(posts), 50)
         ids = set()
         for p in posts:
             old = re.search(r"/shop/tproduct/521041493-(\d+)-", p["link"])
-            new = re.search(r"https://ivory-art\.com/tproduct/1-(\d+)-", p["public_link"])
+            new = re.fullmatch(r"https://ivory-art[.]com/#ia-product-([0-9]+)", p["public_link"])
             self.assertIsNotNone(old, p["title"])
             self.assertIsNotNone(new, p["title"])
             self.assertEqual(old.group(1), new.group(1), p["title"])
@@ -40,8 +40,8 @@ class CurrentCatalogLinksTests(unittest.TestCase):
 
     def test_telegram_and_max_buttons_use_public_link(self):
         bot = load("paintings")
-        post = {"link": "https://ivory-art.com/shop/tproduct/old",
-                "public_link": "https://ivory-art.com/tproduct/1-new",
+        post = {"link": "https://ivory-art.com/shop/tproduct/521041493-769304391932-ekzotichnii-ekzemplyar",
+                "public_link": "https://ivory-art.com/#ia-product-769304391932",
                 "caption": "Test", "title": "Test"}
         with patch.dict(os.environ, {"BOT_TOKEN": "token", "CHANNEL_ID": "@channel"}):
             with patch.object(bot, "multipart", return_value=({}, False)) as sent:
@@ -53,6 +53,21 @@ class CurrentCatalogLinksTests(unittest.TestCase):
                     bot.max_send(post, (b"test", "image/jpeg"))
                     payload = sent.call_args.args[1]
                     self.assertEqual(payload["attachments"][1]["payload"]["buttons"][0][0]["url"], post["public_link"])
+
+    def test_legacy_link_is_forced_to_new_product_modal(self):
+        bot = load("paintings")
+        old_post = {
+            "link": "https://ivory-art.com/shop/tproduct/521041493-769304391932-ekzotichnii-ekzemplyar",
+            "public_link": "https://ivory-art.com/tproduct/1-769304391932-ekzotichnii-ekzemplyar",
+        }
+        self.assertEqual(bot.artwork_url(old_post),
+                         "https://ivory-art.com/#ia-product-769304391932")
+
+    def test_missing_product_id_cannot_make_broken_post_link(self):
+        bot = load("paintings")
+        with self.assertRaises(ValueError):
+            bot.artwork_url({"link": "https://ivory-art.com/shop/tproduct/bad"})
+
 
 if __name__ == "__main__":
     unittest.main()
