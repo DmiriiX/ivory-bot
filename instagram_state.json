@@ -24,14 +24,6 @@
       "buffer_status": "sent",
       "external_link": "https://www.instagram.com/p/Dff0coXlWI_/",
       "checked_at": "2026-11-08T22:24:46.004370+00:00"
-    },
-    "877c981e3b8d2d4d44e2d1c1": {
-      "title": "Жаркое лето",
-      "status": "failed",
-      "created_at": "2026-11-09T15:51:10.593534+00:00",
-      "campaign": true,
-      "campaign_date": "2026-11-09",
-      "error": "Invalid post: Video frame rate must be at least 23 fps for Instagram Reels."
     }
   },
   "failed_attempts": [
@@ -49,6 +41,17 @@
       "created_at": "2026-11-08T21:33:58.559069+00:00",
       "error": "Invalid post: Image could not be read from its URL.",
       "reason": "Second attempt: Buffer could not read Render-hosted URL; fixed by static GitHub JPEG"
+    },
+    {
+      "title": "Жаркое лето",
+      "status": "failed",
+      "created_at": "2026-11-09T15:51:10.593534+00:00",
+      "campaign": true,
+      "campaign_date": "2026-11-09",
+      "error": "Invalid post: Video frame rate must be at least 23 fps for Instagram Reels.",
+      "artwork_id": "877c981e3b8d2d4d44e2d1c1",
+      "reconciled_at": "2026-11-09",
+      "reason": "Buffer explicitly rejected 15fps; media rebuilt and verified at 30fps; no post accepted"
     }
   ],
   "interrupted_attempts": [
