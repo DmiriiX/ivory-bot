@@ -437,92 +437,129 @@ async def sync_instagram(read_file, update_file, identity, github_api):
 
 
 async def sync_instagram_story(read_file, update_file, identity):
-    """At most one Instagram Story on each M/W/F slot, guarded against duplicates."""
+    """Publish an editorial three-slide Story sequence, never repeating uncertain sends.
+
+    Each slide has its own durable reservation/Buffer ID on the runtime-only
+    branch. Re-entry continues only missing slides of the SAME selected artwork.
+    """
     state, sha = await read_file("paintings", "instagram_state.json")
     campaign = state.get("campaign") or {}
     now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
     if not state.get("enabled") or not due_now(campaign, "story", now_msk):
         return {"ok": True, "reason": "No Story campaign slot"}
-    story_records = state.setdefault("story_records", {})
-    today = now_msk.date().isoformat()
-    if any(v.get("campaign_date") == today for v in story_records.values()):
-        return {"ok": True, "reason": "Story already reserved for today"}
 
-    # An earlier accepted Story must be checked before scheduling anything else.
-    for key, record in list(story_records.items()):
-        if record.get("status") == "uncertain":
-            return {"ok": False, "reason": "Story delivery uncertain; manual review required"}
-        if record.get("status") == "accepted" and record.get("buffer_post_id"):
-            try:
-                remote = await get_buffer_status(record["buffer_post_id"])
-                status = remote.get("status")
-                if status in ("sent", "error", "failed"):
-                    record["status"] = status
-                    record["external_link"] = remote.get("externalLink")
-                    updated = await update_file("paintings", "instagram_state.json", state, sha,
-                                                "Confirm Buffer Story status [skip ci]")
-                    sha = (updated.get("content") or {}).get("sha") or (await read_file(
-                        "paintings", "instagram_state.json"))[1]
-                else:
-                    return {"ok": True, "reason": "Previous Story still pending in Buffer"}
-            except Exception:
-                return {"ok": True, "reason": "Previous Story status temporarily unavailable"}
+    today = now_msk.date().isoformat()
+    records = state.setdefault("story_records", {})
+    # One attempted series per date; never silently substitute a second artwork.
+    today_records = [v for v in records.values()
+                     if v.get("campaign_date") == today]
+    existing_artworks = {v.get("artwork_id") for v in today_records}
+    if len(existing_artworks) > 1:
+        return {"ok": False, "reason": "Conflicting Story series needs manual review"}
+    if any(v.get("status") == "uncertain" for v in records.values()):
+        return {"ok": False, "reason": "Uncertain Story delivery needs manual review"}
+    if any(v.get("status") in ("failed", "error") for v in today_records):
+        return {"ok": False, "reason": "Rejected Story slide needs manual review"}
 
     posts, _ = await read_file("paintings", "posts.json")
     rich, _ = await read_file("paintings", "instagram_assets.json")
-    images = rich.get("artworks") or {}
-    used_story_artwork = {v.get("artwork_id") for v in story_records.values()}
-    sent_feed = sorted(
-        [(i, v) for i, v in (state.get("records") or {}).items()
-         if v.get("status") == "sent" and i in images and images[i].get("story")],
-        key=lambda x: x[1].get("created_at", ""), reverse=True)
-    selected = next((i for i, v in sent_feed if i not in used_story_artwork), None)
-    if not selected:
-        return {"ok": True, "reason": "No newly published painting with a prepared Story"}
-    post = next((p for p in posts if identity("paintings", p) == selected), None)
-    if not post:
-        return {"ok": False, "reason": "Story artwork not found"}
-    story_url = images[selected]["story"]
-    prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
-    if not story_url.startswith(prefix) or not story_url.endswith("-story.jpg"):
-        return {"ok": False, "reason": "Invalid prepared Story media"}
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-        try:
-            head = await client.head(story_url)
-            if head.status_code != 200 or not head.headers.get("content-type", "").startswith("image/"):
-                return {"ok": False, "reason": "Prepared Story image not reachable"}
-        except httpx.HTTPError:
-            return {"ok": False, "reason": "Prepared Story image not reachable"}
+    assets = rich.get("artworks") or {}
+    if existing_artworks:
+        selected = next(iter(existing_artworks))
+    else:
+        # Only work from already-confirmed Instagram feed publications.
+        previously_used = {v.get("artwork_id") for v in records.values()}
+        published = sorted(
+            [(i, v) for i, v in (state.get("records") or {}).items()
+             if v.get("status") == "sent"
+             and i in assets and len(assets[i].get("stories") or []) == 3
+             and i not in previously_used],
+            key=lambda x: x[1].get("created_at", ""), reverse=True)
+        selected = published[0][0] if published else None
 
-    record_key = today + ":" + selected
-    story_records[record_key] = {
-        "artwork_id": selected, "title": post.get("title"), "campaign_date": today,
-        "status": "uncertain", "created_at": datetime.now(timezone.utc).isoformat(),
-        "format": "story",
-    }
-    updated = await update_file("paintings", "instagram_state.json", state, sha,
-                                "Reserve Instagram Story to prevent duplicates [skip ci]")
-    reserved_sha = (updated.get("content") or {}).get("sha") or (await read_file(
-        "paintings", "instagram_state.json"))[1]
-    try:
-        remote = await create_buffer_post(
-            (await instagram_channel())["id"], post, None,
-            media=images[selected], kind="story")
-    except ValueError as exc:
-        story_records[record_key]["status"] = "failed"
-        story_records[record_key]["error"] = str(exc)[:180]
-        await update_file("paintings", "instagram_state.json", state, reserved_sha,
-                          "Record Story rejection [skip ci]")
-        return {"ok": False, "reason": "Buffer rejected the Story"}
-    except Exception:
-        # Ambiguous failures never auto-resubmit.
-        return {"ok": False, "reason": "Story outcome unknown: inspect Buffer", "id": record_key}
-    story_records[record_key]["status"] = "accepted"
-    story_records[record_key]["buffer_post_id"] = remote["id"]
-    await update_file("paintings", "instagram_state.json", state, reserved_sha,
-                      "Record Instagram Story acceptance [skip ci]")
-    return {"ok": True, "status": "accepted", "format": "story",
-            "artwork_id": selected}
+    if not selected:
+        return {"ok": True, "reason": "No confirmed artwork with a prepared three-slide Story"}
+    post = next((p for p in posts if identity("paintings", p) == selected), None)
+    slides = (assets.get(selected) or {}).get("stories") or []
+    if not post or len(slides) != 3:
+        return {"ok": False, "reason": "Three-slide Story media is not prepared"}
+
+    prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
+    if any(not isinstance(url, str) or not url.startswith(prefix)
+           or not url.endswith("-story-" + str(i) + ".jpg")
+           for i, url in enumerate(slides, 1)):
+        return {"ok": False, "reason": "Invalid branded Story URLs"}
+
+    # Check all three images BEFORE sending any of the sequence.
+    async with httpx.AsyncClient(timeout=16, follow_redirects=True) as client:
+        for url in slides:
+            try:
+                response = await client.head(url)
+                if response.status_code != 200 or not response.headers.get("content-type", "").startswith("image/"):
+                    return {"ok": False, "reason": "Branded Story images unavailable"}
+            except httpx.HTTPError:
+                return {"ok": False, "reason": "Branded Story images unavailable"}
+
+    channel_id = (await instagram_channel())["id"]
+    accepted = 0
+    for i, image_url in enumerate(slides, 1):
+        record_key = f"{today}:{selected}:slide-{i}"
+        previous = records.get(record_key)
+        if previous:
+            if previous.get("status") in ("accepted", "sent") and previous.get("buffer_post_id"):
+                accepted += 1
+                continue
+            # Prevent retries of uncertain or rejected individual frames.
+            return {"ok": False, "reason": "Story slide needs manual review",
+                    "slide": i, "accepted": accepted}
+
+        records[record_key] = {
+            "artwork_id": selected, "title": post.get("title"),
+            "campaign_date": today, "slide": i, "total_slides": 3,
+            "format": "story", "status": "uncertain",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        updated = await update_file(
+            "paintings", "instagram_state.json", state, sha,
+            f"Reserve Instagram Story frame {i}/3 without duplicates [skip ci]")
+        sha = (updated.get("content") or {}).get("sha") or (
+            await read_file("paintings", "instagram_state.json"))[1]
+        try:
+            remote = await create_buffer_post(
+                channel_id, post, None,
+                media={"story": image_url}, kind="story")
+        except ValueError as exc:
+            records[record_key]["status"] = "failed"
+            records[record_key]["error"] = str(exc)[:230]
+            await update_file(
+                "paintings", "instagram_state.json", state, sha,
+                f"Record Buffer rejected Story frame {i} [skip ci]")
+            return {"ok": False, "reason": "Buffer rejected Story slide",
+                    "slide": i, "accepted": accepted}
+        except Exception as exc:
+            # The request may have been accepted before a network failure.
+            records[record_key]["failure_type"] = type(exc).__name__
+            try:
+                await update_file(
+                    "paintings", "instagram_state.json", state, sha,
+                    f"Record uncertain Story frame {i} [skip ci]")
+            except Exception:
+                pass
+            return {"ok": False, "reason": "Story delivery uncertain; inspect Buffer",
+                    "slide": i, "accepted": accepted}
+        records[record_key]["status"] = "accepted"
+        records[record_key]["buffer_post_id"] = remote["id"]
+        records[record_key]["buffer_status"] = remote.get("status")
+        updated = await update_file(
+            "paintings", "instagram_state.json", state, sha,
+            f"Record accepted Instagram Story frame {i}/3 [skip ci]")
+        sha = (updated.get("content") or {}).get("sha") or (
+            await read_file("paintings", "instagram_state.json"))[1]
+        accepted += 1
+
+    return {"ok": True, "status": "accepted", "format": "story_triptych",
+            "artwork_id": selected, "slides_accepted": accepted,
+            "note": "Buffer acceptance is not proof of Instagram delivery"}
 
 
 async def collect_post_metrics(records):
