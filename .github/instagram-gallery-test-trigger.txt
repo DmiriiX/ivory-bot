@@ -1,1 +1,1 @@
-Fifth diagnostic: check product UID lookup and Tilda API reachability
+Sixth test: corrected Tilda API catalog cache initialization
