@@ -396,8 +396,17 @@ async def sync_instagram(read_file, update_file, identity, github_api):
         records[item_id]["error"] = str(exc)[:250]
         await update_file("paintings", "instagram_state.json", state, new_sha, "Record Instagram validation failure")
         return {"ok": False, "reason": "Buffer rejected image/post", "id": item_id}
-    except Exception:
-        # Unknown outcome; keep uncertain for operator review.
+    except Exception as exc:
+        # Do not blindly retry an ambiguous network/Buffer outcome.
+        # Record only a bounded diagnostic and preserve the reservation.
+        records[item_id]["failure_type"] = type(exc).__name__
+        records[item_id]["failure_message"] = str(exc)[:300]
+        print("Instagram media request failed:", type(exc).__name__, str(exc)[:300])
+        try:
+            await update_file("paintings", "instagram_state.json", state, new_sha,
+                              "Record uncertain Buffer media failure without retries")
+        except Exception:
+            pass
         return {"ok": False, "reason": "Unknown Buffer delivery: inspect Buffer queue before retrying", "id": item_id}
     records[item_id]["buffer_post_id"] = remote["id"]
     records[item_id]["buffer_status"] = remote.get("status", "")
