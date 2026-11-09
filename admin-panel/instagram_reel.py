@@ -64,7 +64,6 @@ async def make_reel(images):
             # Strict Tilda domain allowlist and size constraints in normalized_image.
             data = await normalized_image(source)
             p = root / f"frame-{i}.jpg"
-            await asyncio.to_thread(frame_image, data).save if False else asyncio.sleep(0)
             frame = await asyncio.to_thread(frame_image, data)
             frame.save(p, "JPEG", quality=88)
             files.append(p)
