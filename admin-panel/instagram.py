@@ -408,6 +408,95 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     return {"ok": True, "id": item_id, "status": "accepted"}
 
 
+async def sync_instagram_story(read_file, update_file, identity):
+    """At most one Instagram Story on each M/W/F slot, guarded against duplicates."""
+    state, sha = await read_file("paintings", "instagram_state.json")
+    campaign = state.get("campaign") or {}
+    now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
+    if not state.get("enabled") or not due_now(campaign, "story", now_msk):
+        return {"ok": True, "reason": "No Story campaign slot"}
+    story_records = state.setdefault("story_records", {})
+    today = now_msk.date().isoformat()
+    if any(v.get("campaign_date") == today for v in story_records.values()):
+        return {"ok": True, "reason": "Story already reserved for today"}
+
+    # An earlier accepted Story must be checked before scheduling anything else.
+    for key, record in list(story_records.items()):
+        if record.get("status") == "uncertain":
+            return {"ok": False, "reason": "Story delivery uncertain; manual review required"}
+        if record.get("status") == "accepted" and record.get("buffer_post_id"):
+            try:
+                remote = await get_buffer_status(record["buffer_post_id"])
+                status = remote.get("status")
+                if status in ("sent", "error", "failed"):
+                    record["status"] = status
+                    record["external_link"] = remote.get("externalLink")
+                    updated = await update_file("paintings", "instagram_state.json", state, sha,
+                                                "Confirm Buffer Story status [skip ci]")
+                    sha = (updated.get("content") or {}).get("sha") or (await read_file(
+                        "paintings", "instagram_state.json"))[1]
+                else:
+                    return {"ok": True, "reason": "Previous Story still pending in Buffer"}
+            except Exception:
+                return {"ok": True, "reason": "Previous Story status temporarily unavailable"}
+
+    posts, _ = await read_file("paintings", "posts.json")
+    rich, _ = await read_file("paintings", "instagram_assets.json")
+    images = rich.get("artworks") or {}
+    used_story_artwork = {v.get("artwork_id") for v in story_records.values()}
+    sent_feed = sorted(
+        [(i, v) for i, v in (state.get("records") or {}).items()
+         if v.get("status") == "sent" and i in images and images[i].get("story")],
+        key=lambda x: x[1].get("created_at", ""), reverse=True)
+    selected = next((i for i, v in sent_feed if i not in used_story_artwork), None)
+    if not selected:
+        return {"ok": True, "reason": "No newly published painting with a prepared Story"}
+    post = next((p for p in posts if identity("paintings", p) == selected), None)
+    if not post:
+        return {"ok": False, "reason": "Story artwork not found"}
+    story_url = images[selected]["story"]
+    prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
+    if not story_url.startswith(prefix) or not story_url.endswith("-story.jpg"):
+        return {"ok": False, "reason": "Invalid prepared Story media"}
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        try:
+            head = await client.head(story_url)
+            if head.status_code != 200 or not head.headers.get("content-type", "").startswith("image/"):
+                return {"ok": False, "reason": "Prepared Story image not reachable"}
+        except httpx.HTTPError:
+            return {"ok": False, "reason": "Prepared Story image not reachable"}
+
+    record_key = today + ":" + selected
+    story_records[record_key] = {
+        "artwork_id": selected, "title": post.get("title"), "campaign_date": today,
+        "status": "uncertain", "created_at": datetime.now(timezone.utc).isoformat(),
+        "format": "story",
+    }
+    updated = await update_file("paintings", "instagram_state.json", state, sha,
+                                "Reserve Instagram Story to prevent duplicates [skip ci]")
+    reserved_sha = (updated.get("content") or {}).get("sha") or (await read_file(
+        "paintings", "instagram_state.json"))[1]
+    try:
+        remote = await create_buffer_post(
+            (await instagram_channel())["id"], post, None,
+            media=images[selected], kind="story")
+    except ValueError as exc:
+        story_records[record_key]["status"] = "failed"
+        story_records[record_key]["error"] = str(exc)[:180]
+        await update_file("paintings", "instagram_state.json", state, reserved_sha,
+                          "Record Story rejection [skip ci]")
+        return {"ok": False, "reason": "Buffer rejected the Story"}
+    except Exception:
+        # Ambiguous failures never auto-resubmit.
+        return {"ok": False, "reason": "Story outcome unknown: inspect Buffer", "id": record_key}
+    story_records[record_key]["status"] = "accepted"
+    story_records[record_key]["buffer_post_id"] = remote["id"]
+    await update_file("paintings", "instagram_state.json", state, reserved_sha,
+                      "Record Instagram Story acceptance [skip ci]")
+    return {"ok": True, "status": "accepted", "format": "story",
+            "artwork_id": selected}
+
+
 async def collect_post_metrics(records):
     """Read-only experimental Buffer metrics; absence means unknown, never zero."""
     results = {}
