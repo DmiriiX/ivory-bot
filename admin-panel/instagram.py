@@ -248,9 +248,10 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
     }
     """
     if kind == "story":
-        story_url = (media or {}).get("story") or ""
         prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
-        if not story_url.startswith(prefix) or not story_url.endswith("-story.jpg"):
+        story_url = (media or {}).get("story") or ""
+        if (not story_url.startswith(prefix)
+                or not (story_url.endswith("-story.jpg") or re.search(r"-story-[123]\\.jpg$", story_url))):
             raise ValueError("Prepared Story is missing")
         assets = [{"image": {"url": story_url}}]
     elif media is not None:
@@ -346,13 +347,27 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     available = {k: v for k, v in (rich_index.get("artworks") or {}).items()
                  if len(v.get("images") or []) >= 2}
     if in_campaign:
-        # Prioritize fully prepared media, then never-before-posted single images.
-        new = next((p for p in posts if identity("paintings", p) in available
-                    and identity("paintings", p) not in records
-                    and identity("paintings", p) not in ignored), None)
+        # Reels alternate Cinematic / Luxury; only choose prepared artwork with
+        # the next style if available, never repeat a previous product.
+        next_format = feed_format(records, {"carousel", "reel"})
+        reel_count = sum(1 for v in records.values()
+                         if v.get("campaign") is True and v.get("status") in ("sent", "accepted")
+                         and v.get("format") == "reel")
+        preferred_style = ("cinematic", "luxury")[reel_count % 2]
+        candidates = [p for p in posts
+                      if identity("paintings", p) not in records
+                      and identity("paintings", p) not in ignored]
+        if next_format == "reel":
+            new = next((p for p in candidates
+                        if available.get(identity("paintings", p), {}).get("reel_style") == preferred_style
+                        and available.get(identity("paintings", p), {}).get("reel")), None)
+            if not new:
+                new = next((p for p in candidates
+                            if available.get(identity("paintings", p), {}).get("reel")), None)
+        else:
+            new = next((p for p in candidates if identity("paintings", p) in available), None)
         if not new:
-            new = next((p for p in posts if identity("paintings", p) not in records
-                        and identity("paintings", p) not in ignored), None)
+            new = candidates[0] if candidates else None
     else:
         new = test_candidate or next((p for p in posts if identity("paintings", p) in used and
                     identity("paintings", p) not in ignored and identity("paintings", p) not in records), None)
@@ -391,6 +406,8 @@ async def sync_instagram(read_file, update_file, identity, github_api):
             (await instagram_channel())["id"], new, image_url,
             media=prepared if chosen != "post" else None, kind=chosen)
         records[item_id]["format"] = chosen
+        if chosen == "reel" and prepared:
+            records[item_id]["reel_style"] = prepared.get("reel_style", "legacy")
     except ValueError as exc:
         records[item_id]["status"] = "failed"
         records[item_id]["error"] = str(exc)[:250]
