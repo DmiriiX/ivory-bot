@@ -1,6 +1,0 @@
-2026-11-09 urgent regenerate 30fps compliant Instagram Reels with original ambient audio
-Rebuild all six and ffprobe check frame-rate on 2026-11-09
-
-2026-11-09: build premium Cinematic/Luxury reels + Story triptych; no publishing
-
-Rebuild all six version-3 premium videos with distinct Cinematic and Luxury original soundtracks.
