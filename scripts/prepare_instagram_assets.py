@@ -16,8 +16,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "admin-panel"))
 from instagram_gallery import discover_gallery, product_uid
-from instagram_reel import make_reel
-from instagram_story import story_image
+from instagram_editorial import make_editorial_reel
+from instagram_story import story_triptych
 from instagram_translations import TITLES, ARTISTS
 from media import normalized_image
 
@@ -31,7 +31,7 @@ def identity(post):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
 
 
-async def prepare(post, existing):
+async def prepare(post, existing, style):
     ident = identity(post)
     images, source = await discover_gallery(post)
     if len(images) < 2:
@@ -43,23 +43,35 @@ async def prepare(post, existing):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(await normalized_image(url))
         photos.append(BASE_URL + filename)
-    story_path = f"instagram-media/prepared/{ident}-story.jpg"
-    story_bytes = story_image(await normalized_image(images[0]),
-                               TITLES.get(post.get("title"), "Original Artwork"),
-                               ARTISTS.get(post.get("artist"), "IVORY ART Gallery"))
-    (ROOT / story_path).write_bytes(story_bytes)
+    title_ru = post.get("title") or "Авторская картина"
+    artist_ru = post.get("artist") or "IVORY ART"
+    import re
+    clean = re.sub(r"<[^>]+>", "", post.get("caption") or "")
+    dims = re.search(r"\\d{1,4}\\s*[×xхХ]\\s*\\d{1,4}\\s*см", clean)
+    sources = [await normalized_image(u) for u in images[:2]]
+    pack = story_triptych(sources, title_ru, artist_ru,
+                          dims.group(0) if dims else "")
+    story_urls = []
+    for slide, data in enumerate(pack, 1):
+        story_path = f"instagram-media/prepared/{ident}-story-{slide}.jpg"
+        (ROOT / story_path).write_bytes(data)
+        story_urls.append(BASE_URL + story_path)
     reel = None
     try:
-        video = await make_reel(images[:4])
-        video_name = f"instagram-media/prepared/{ident}.mp4"
+        video = await make_editorial_reel(images[:2],
+                          TITLES.get(title_ru, title_ru),
+                          ARTISTS.get(artist_ru, artist_ru), style)
+        video_name = f"instagram-media/prepared/{ident}-{style}.mp4"
         (ROOT / video_name).write_bytes(video)
         reel = BASE_URL + video_name
     except Exception as exc:
-        # A carousel may still be usable even when video preparation fails.
-        print("Reel unavailable:", ident, type(exc).__name__)
-    return {"title": post.get("title"), "image_count": len(photos),
+        print("Editorial Reel unavailable:", ident, style, type(exc).__name__)
+    return {"title": title_ru, "image_count": len(photos),
             "gallery_source": source, "images": photos, "reel": reel,
-            "story": BASE_URL + story_path, "music": "Original IVORY ART instrumental ambient",
+            "reel_style": style if reel else None,
+            "stories": story_urls, "story": story_urls[0],
+            "creative_version": 2,
+            "music": "Original IVORY ART instrumental ambient",
             "reel_fps": 30 if reel else None}
 
 
@@ -74,15 +86,19 @@ async def main(limit):
     cursor = ((datetime.now(timezone.utc).date().toordinal() * 12) % max(1, len(posts)))
     retries = [p for p in posts if identity(p) in records and
                (not records[identity(p)].get("reel") or not records[identity(p)].get("story")
-                or records[identity(p)].get("reel_fps", 0) < 23)]
+                or records[identity(p)].get("reel_fps", 0) < 23
+                or records[identity(p)].get("creative_version", 0) < 2)]
     scan = retries[:12] + [posts[(cursor + offset) % len(posts)] for offset in range(min(12, len(posts)))]
     for post in scan:
         ident = identity(post)
+        # Alternate catalogue positions: a balanced supply for both styles.
+        style = 'cinematic' if posts.index(post) % 2 == 0 else 'luxury'
         if (ident in records and records[ident].get("reel") and records[ident].get("story")
-                and records[ident].get("reel_fps", 0) >= 23):
+                and records[ident].get("reel_fps", 0) >= 23
+                and records[ident].get("creative_version", 0) >= 2):
             continue
         try:
-            result = await prepare(post, records.get(ident))
+            result = await prepare(post, records.get(ident), style)
         except Exception as exc:
             print("Skipped unavailable media:", ident, type(exc).__name__)
             continue
