@@ -64,3 +64,36 @@ def next_instagram_check(now=None, enabled=True):
                 return {"next_at": slot.isoformat(), "reason": "check_only",
                         "timezone": "Europe/Moscow"}
     return {"next_at": None, "reason": "unavailable"}
+
+
+
+def next_instagram_publication(history, now=None):
+    """Next eligible Instagram slot; depends on TG/MAX artwork availability."""
+    now = (now or datetime.now(MSK)).astimezone(MSK)
+    if not history.get("enabled", False):
+        return {"next_at": None, "reason": "paused"}
+    records = history.get("records") or {}
+    if any(v.get("status") == "uncertain" for v in records.values()):
+        return {"next_at": None, "reason": "pending"}
+    if any(v.get("status") == "accepted" for v in records.values()):
+        # Wait for Buffer to confirm the previous post before scheduling another.
+        return {"next_at": None, "reason": "pending"}
+    latest = None
+    for record in records.values():
+        if record.get("status") != "sent":
+            continue
+        try:
+            stamp = datetime.fromisoformat(record["created_at"])
+            stamp = stamp.replace(tzinfo=MSK) if stamp.tzinfo is None else stamp
+            latest = max(latest, stamp.astimezone(MSK)) if latest else stamp.astimezone(MSK)
+        except (KeyError, TypeError, ValueError):
+            continue
+    earliest = latest.date() + timedelta(days=3) if latest else now.date()
+    for offset in range(120):
+        day = max(now.date(), earliest) + timedelta(days=offset)
+        slot = datetime.combine(day, time(18, 15), tzinfo=MSK)
+        if slot > now:
+            return {"next_at": slot.isoformat(), "reason": "scheduled",
+                    "timezone": "Europe/Moscow",
+                    "note": "Только при наличии новой картины, опубликованной в Telegram и MAX"}
+    return {"next_at": None, "reason": "unavailable"}
