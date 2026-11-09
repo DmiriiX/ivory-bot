@@ -203,7 +203,38 @@ async def ensure_public_image(post, item_id, github_api):
     raise RuntimeError("GitHub-hosted artwork has not yet become publicly accessible")
 
 
-async def create_buffer_post(channel_id, post, image_url):
+def rich_media_assets(media, kind):
+    """Build verified Buffer assets from pre-rendered public GitHub media."""
+    if kind not in ("carousel", "reel"):
+        raise ValueError("Unsupported Instagram media format")
+    prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
+    if kind == "reel":
+        link = media.get("reel") or ""
+        if not link.startswith(prefix) or not link.endswith(".mp4"):
+            raise ValueError("No prepared Reel is available")
+        return [{"video": {"url": link}}]
+    links = media.get("images") or []
+    if not 2 <= len(links) <= 5 or not all(isinstance(url, str) and url.startswith(prefix) and url.endswith(".jpg") for url in links):
+        raise ValueError("Carousel photos are unavailable")
+    return [{"image": {"url": link}} for link in links]
+
+
+async def prepared_media_ready(media, kind):
+    """Buffer can only fetch media at publicly reachable URLs."""
+    assets = rich_media_assets(media, kind)
+    urls = [a.get("image", a.get("video"))["url"] for a in assets]
+    async with httpx.AsyncClient(timeout=12, follow_redirects=True) as client:
+        for link in urls:
+            try:
+                res = await client.head(link)
+                if res.status_code != 200:
+                    return False
+            except httpx.HTTPError:
+                return False
+    return True
+
+
+async def create_buffer_post(channel_id, post, image_url, media=None, kind='post'):
     url = post.get("photo", "")
     if not url.startswith("https://"):
         raise ValueError("Artwork needs a publicly accessible HTTPS image")
@@ -215,13 +246,18 @@ async def create_buffer_post(channel_id, post, image_url):
       }
     }
     """
+    if media is not None:
+        assets = rich_media_assets(media, kind)
+    else:
+        assets = [{"image": {"url": image_url}}]
+        kind = "post"
     payload = {
         "text": post_caption(post),
         "channelId": channel_id,
         "schedulingType": "automatic",
         "mode": "shareNow",
-        "assets": [{"image": {"url": image_url}}],
-        "metadata": {"instagram": {"type": "post", "shouldShareToFeed": True}},
+        "assets": assets,
+        "metadata": {"instagram": {"type": "reel" if kind == "reel" else "post", "shouldShareToFeed": True}},
     }
     data = await graphql(mutation, {"input": payload})
     result = data.get("createPost") or {}
@@ -253,6 +289,14 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     used.update(identity("paintings", posts[i]) for i in current.get("used_indices", []) if type(i) is int and 0 <= i < len(posts))
     ignored = set(state.get("baseline_ids") or [])
     records = state.setdefault("records", {})
+    # Optional staged media extension. Default false until verified on actual products.
+    rich_index = {"artworks": {}}
+    if state.get("rich_media_enabled", False):
+        try:
+            rich_index, _ = await read_file("paintings", "instagram_assets.json")
+        except Exception:
+            rich_index = {"artworks": {}}
+
     # Check previously accepted posts without creating duplicates.
     for item_id, record in list(records.items()):
         if record.get("status") == "accepted" and record.get("buffer_post_id"):
@@ -299,8 +343,21 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     if not new_sha:
         _, new_sha = await read_file("paintings", "instagram_state.json")
     try:
-        image_url = await ensure_public_image(new, item_id, github_api)
-        remote = await create_buffer_post((await instagram_channel())["id"], new, image_url)
+        prepared = (rich_index.get("artworks") or {}).get(item_id)
+        chosen = "post"
+        if prepared and prepared.get("image_count", 0) >= 2:
+            # Rotate without reposting the same artwork in multiple formats.
+            rich_count = sum(1 for rec in records.values() if rec.get("format") in ("carousel", "reel"))
+            chosen = "reel" if rich_count % 3 == 2 and prepared.get("reel") else "carousel"
+            if not await prepared_media_ready(prepared, chosen):
+                chosen = "post"
+        image_url = None
+        if chosen == "post":
+            image_url = await ensure_public_image(new, item_id, github_api)
+        remote = await create_buffer_post(
+            (await instagram_channel())["id"], new, image_url,
+            media=prepared if chosen != "post" else None, kind=chosen)
+        records[item_id]["format"] = chosen
     except ValueError as exc:
         records[item_id]["status"] = "failed"
         records[item_id]["error"] = str(exc)[:250]
