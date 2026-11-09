@@ -27,10 +27,11 @@
     },
     "877c981e3b8d2d4d44e2d1c1": {
       "title": "Жаркое лето",
-      "status": "uncertain",
+      "status": "failed",
       "created_at": "2026-11-09T15:51:10.593534+00:00",
       "campaign": true,
-      "campaign_date": "2026-11-09"
+      "campaign_date": "2026-11-09",
+      "error": "Invalid post: Video frame rate must be at least 23 fps for Instagram Reels."
     }
   },
   "failed_attempts": [
