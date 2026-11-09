@@ -24,6 +24,8 @@ jobs:
       - name: Install media preparation tools
         run: |
           python3 -m pip install -r admin-panel/requirements.txt
+      - name: Inspect public Tilda store configuration
+        run: python3 scripts/inspect_tilda_store.py
       - name: Generate a small batch of media
         env:
           IVORY_MEDIA_DEBUG: '1'
