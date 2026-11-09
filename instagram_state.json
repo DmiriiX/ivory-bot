@@ -51,5 +51,27 @@
       "reason": "GitHub image upload triggered Render redeploy, request aborted; Buffer read-only audit found no matching post"
     }
   ],
-  "rich_media_enabled": true
+  "rich_media_enabled": true,
+  "campaign": {
+    "enabled": true,
+    "start_date": "2026-11-10",
+    "end_date": "2026-12-09",
+    "feed_days": [
+      "tuesday",
+      "thursday",
+      "saturday",
+      "sunday"
+    ],
+    "feed_time_msk": "18:15",
+    "story_days": [
+      "monday",
+      "wednesday",
+      "friday"
+    ],
+    "story_time_msk": "19:15",
+    "target_feed_per_week": 4,
+    "paid_ads": false,
+    "music": "original ambient instrumentals embedded in Reels"
+  },
+  "story_records": {}
 }
