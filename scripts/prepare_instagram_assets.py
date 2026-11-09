@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "admin-panel"))
-from instagram_gallery import discover_gallery
+from instagram_gallery import discover_gallery, product_uid
 from instagram_reel import make_reel
 from media import normalized_image
 
@@ -58,6 +58,8 @@ async def main(limit):
     posts = json.loads((ROOT / "posts.json").read_text(encoding="utf-8"))
     index = json.loads(INDEX_PATH.read_text(encoding="utf-8")) if INDEX_PATH.exists() else {"version": 1, "artworks": {}}
     records = index.setdefault("artworks", {})
+    if os.environ.get("IVORY_MEDIA_DEBUG") == "1":
+        print("Product UID examples:", [product_uid(p) for p in posts[:3]])
     handled = 0
     # Bound requests per scheduled run; rotate across the catalog.
     cursor = ((datetime.now(timezone.utc).date().toordinal() * 12) % max(1, len(posts)))
