@@ -45,7 +45,7 @@ jobs:
           if last and datetime.fromisoformat(last).astimezone(ZoneInfo("Europe/Moscow")).date() == now:
               import os
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  f.write("skip=true\\n")
+                  print("skip=true", file=f)
               print("Today's painting already posted: kickoff skipped")
           else:
               print("Today's kickoff is eligible; partial delivery remains protected by state.json")
