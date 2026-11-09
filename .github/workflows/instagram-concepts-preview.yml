@@ -1,0 +1,55 @@
+name: Ivory Art - 3 visual concepts (no publishing)
+on:
+  push:
+    paths:
+      - "scripts/render_instagram_concepts.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install visual rendering dependencies
+        run: |
+          python -m pip install Pillow numpy
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - name: Render both Reels and three Stories
+        run: python scripts/render_instagram_concepts.py
+      - name: Validate frame rate and audio
+        run: |
+          for video in concept-previews/*.mp4; do
+            ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$video" | grep -q "codec_name=aac"
+            ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$video" | grep -q "codec_name=h264"
+            FPS=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 "$video")
+            python - "$FPS" <<'PY'
+          from fractions import Fraction
+          import sys
+          assert Fraction(sys.argv[1]) >= 23, "Instagram requires 23 fps minimum"
+          PY
+          done
+      - name: Package downloadable previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: ivory-art-3-concepts
+          path: |
+            concept-previews/*.mp4
+            concept-previews/*.jpg
+          retention-days: 30
+          compression-level: 6
+      - name: Publish preview files on a separate branch (never trigger Render)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b instagram-concepts
+          git add concept-previews/*.mp4 concept-previews/*.jpg
+          git commit -m "Three Ivory Art creative preview concepts - private to workflow, no social posting"
+          git push origin HEAD:refs/heads/instagram-concepts
