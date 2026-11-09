@@ -129,7 +129,7 @@ def draw_frame(t, photos, title, artist, style):
 
 def _encode(photos,title,artist,style,out):
     wav=out.with_suffix(".wav")
-    original_ambient_audio(wav,DURATION)
+    original_ambient_audio(wav,DURATION,style)
     cmd=["ffmpeg","-hide_banner","-loglevel","error","-nostdin","-y",
          "-f","rawvideo","-pixel_format","rgb24","-video_size","720x1280",
          "-framerate",str(FPS),"-i","pipe:0","-i",str(wav),
