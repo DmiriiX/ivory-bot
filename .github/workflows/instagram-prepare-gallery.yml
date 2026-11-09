@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: "20 5 * * *"
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/instagram-video-fps-test.txt"
 
 permissions:
   contents: write
@@ -33,6 +36,15 @@ jobs:
             [ -f "$video" ] || continue
             ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$video" | grep -q 'codec_name=h264'
             ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$video" | grep -q 'codec_name=aac'
+            FPS=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 "$video")
+            python3 - "$FPS" <<'PY'
+          from fractions import Fraction
+          import sys
+          fps = Fraction(sys.argv[1])
+          if fps < 23:
+              raise SystemExit("Instagram Reel below 23 fps: " + str(fps))
+          print("Validated Reel FPS:", float(fps))
+          PY
           done
       - name: Store stable assets without triggering publisher workflows
         run: |
