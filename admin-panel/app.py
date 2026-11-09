@@ -151,6 +151,31 @@ def identity(kind, post):
     return hashlib.sha256(value.encode()).hexdigest()[:24]
 
 
+def metrics_cipher():
+    """Encryption is mandatory because this GitHub repository is public."""
+    from cryptography.fernet import Fernet
+    key = os.getenv("INSTAGRAM_METRICS_ENCRYPTION_KEY", "").strip()
+    if not key:
+        raise HTTPException(503, "Instagram metrics encryption key unavailable")
+    return Fernet(key.encode("ascii"))
+
+
+def decode_metrics_file(document):
+    import base64
+    if not document.get("ciphertext"):
+        return {"checked_at": None, "posts": {}}
+    try:
+        return json.loads(metrics_cipher().decrypt(
+            document["ciphertext"].encode("ascii")).decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(503, "Unable to decrypt Instagram metrics") from exc
+
+
+def encode_metrics_file(document):
+    data = json.dumps(document, ensure_ascii=False).encode("utf-8")
+    return {"ciphertext": metrics_cipher().encrypt(data).decode("ascii")}
+
+
 async def control_file(kind):
     try:
         return await read_file(kind, "control.json")
@@ -364,7 +389,8 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
     except Exception:
         status["enabled"] = False
     try:
-        metrics, _ = await read_file("paintings", "instagram_metrics.json")
+        metrics_document, _ = await read_file("paintings", "instagram_metrics.json")
+        metrics = decode_metrics_file(metrics_document)
         status["metrics_last_checked"] = metrics.get("checked_at")
         status["metrics_posts"] = [
             {"title": rec.get("title"), "external_link": rec.get("external_link"),
@@ -421,10 +447,11 @@ async def instagram_metrics_sync(authorization: str = Header(default="")):
         # Preserve last successful snapshot if the experimental API is unavailable.
         return {"ok": False, "reason": "Buffer metrics unavailable", "errors": len(results)}
     from datetime import datetime, timezone
-    existing, sha = await read_file("paintings", "instagram_metrics.json")
+    existing_document, sha = await read_file("paintings", "instagram_metrics.json")
+    existing = decode_metrics_file(existing_document)
     existing["checked_at"] = datetime.now(timezone.utc).isoformat()
     existing["posts"] = results
-    await update_file("paintings", "instagram_metrics.json", existing, sha,
+    await update_file("paintings", "instagram_metrics.json", encode_metrics_file(existing), sha,
                       "Update daily Instagram metrics snapshot [skip ci]")
     return {"ok": True, "posts": len(results),
             "with_metrics": sum(bool(p.get("metrics")) for p in results.values())}
