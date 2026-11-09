@@ -56,3 +56,71 @@ def story_image(photo_bytes, title, artist):
     buffer = BytesIO()
     background.save(buffer, "JPEG", quality=92, optimize=True)
     return buffer.getvalue()
+
+
+def story_triptych(photos, title, artist, dimensions=""):
+    """Three distinct 9:16 branded images, preserving real painting pixels.
+
+    Slide 1: entire artwork. Slide 2: real detail crops.
+    Slide 3: entire artwork with a clear site CTA (non-clickable in image).
+    """
+    if not photos:
+        raise ValueError("Story requires artwork")
+    originals=[]
+    for data in photos[:2]:
+        with Image.open(BytesIO(data)) as raw:
+            originals.append(ImageOps.exif_transpose(raw).convert("RGB"))
+    main=originals[0]
+    detail=originals[1] if len(originals)>1 else main
+    result=[]
+    for slide in (1,2,3):
+        canvas=Image.new("RGB",(1080,1920),"#0b0b0a")
+        d=ImageDraw.Draw(canvas)
+        d.text((72,80),"IVORY ART",font=_font(63),fill="#f2e3bc")
+        d.text((76,181),"G A L L E R Y",font=_font(22,False),fill="#c6b997")
+        d.text((920,109),f"0{slide} / 03",font=_font(23,False),fill="#f2e3bc")
+        d.line((72,248,1008,248),fill="#61543b",width=2)
+        if slide==1:
+            photo=main.copy()
+            photo.thumbnail((928,1120),Image.Resampling.LANCZOS)
+            canvas.paste(photo,((1080-photo.width)//2,296+(1120-photo.height)//2))
+            d=ImageDraw.Draw(canvas)
+            title=str(title or "Original Artwork")[:115]
+            artist=str(artist or "IVORY ART Gallery")[:90]
+            d.text((74,1525),"ORIGINAL ART",font=_font(43),fill="#f2e3bc")
+            d.text((74,1624),title,font=_fit_text(title,52,923),fill="#f6f0e3")
+            d.text((74,1720),artist,font=_fit_text(artist,31,920,False),fill="#cfc3ad")
+        elif slide==2:
+            # Crops show authentic photo detail; never synthesize new painting.
+            for pos,(img,focus) in enumerate(((main,.2),(detail,.78))):
+                w,h=920,564
+                scale=max(w/img.width,h/img.height)*1.08
+                iw,ih=int(img.width*scale),int(img.height*scale)
+                frame=img.resize((iw,ih),Image.Resampling.LANCZOS)
+                ox=min(max(0,int((iw-w)*focus)),iw-w)
+                oy=(ih-h)//2
+                frame=frame.crop((ox,oy,ox+w,oy+h))
+                canvas.paste(frame,(80,302+pos*590))
+            d=ImageDraw.Draw(canvas)
+            d.text((76,1550),"THE ART IS IN",font=_font(43),fill="#f2e3bc")
+            d.text((76,1620),"THE DETAILS",font=_font(53),fill="#f2e3bc")
+            dimension=str(dimensions or "")[:84]
+            if dimension:
+                d.text((77,1710),dimension,font=_fit_text(dimension,27,920,False),fill="#d3cab8")
+        else:
+            photo=main.copy()
+            photo.thumbnail((850,1070),Image.Resampling.LANCZOS)
+            canvas.paste(photo,((1080-photo.width)//2,295+(1070-photo.height)//2))
+            d=ImageDraw.Draw(canvas)
+            d.line((72,1417,1008,1417),fill="#756343",width=2)
+            title=str(title or "Original Artwork")[:115]
+            d.text((75,1475),title,font=_fit_text(title,45,930),fill="#f2e3bc")
+            d.text((75,1570),"Смотреть работу на сайте",font=_fit_text("Смотреть работу на сайте",32,930,False),fill="#f6f0e3")
+            d.rectangle((73,1670,1007,1810),outline="#8e7953",width=2)
+            d.text((111,1711),"IVORY-ART.COM",font=_font(45,False),fill="#f2e3bc")
+        d=ImageDraw.Draw(canvas)
+        d.line((73,1860,1007,1860),fill="#61543b",width=2)
+        buffer=BytesIO()
+        canvas.save(buffer,"JPEG",quality=91,optimize=True)
+        result.append(buffer.getvalue())
+    return result
