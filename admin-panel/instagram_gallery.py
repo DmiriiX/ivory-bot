@@ -112,16 +112,38 @@ async def discover_gallery(post):
     manual = [x for x in manual if x]
     if manual:
         return list(dict.fromkeys([primary] + manual))[:MAX_IMAGES], "catalog"
-    url = approved_product_url(post.get("public_link") or post.get("link"))
-    try:
-        async with httpx.AsyncClient(timeout=12, follow_redirects=False) as client:
-            response = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; IvoryArtGallery/1.0)"})
-            response.raise_for_status()
-            if len(response.content) > 2_000_000:
-                raise ValueError("Product page too large")
-        return extract_gallery(response.text, primary), "product_page"
-    except (httpx.HTTPError, ValueError):
-        return [primary], "primary_only"
+    candidates = []
+    for key in ("public_link", "link"):
+        try:
+            url = approved_product_url(post.get(key))
+            if url not in candidates:
+                candidates.append(url)
+        except ValueError:
+            pass
+    for url in candidates:
+        try:
+            async with httpx.AsyncClient(timeout=12, follow_redirects=False) as client:
+                response = await client.get(
+                    url, headers={"User-Agent": "Mozilla/5.0 (compatible; IvoryArtGallery/1.0)"})
+                if response.status_code in (301, 302, 307, 308):
+                    from urllib.parse import urljoin
+                    redirected = urljoin(url, response.headers.get("location", ""))
+                    approved_product_url(redirected)
+                    response = await client.get(redirected)
+                if __import__("os").environ.get("IVORY_MEDIA_DEBUG") == "1":
+                    text = response.text[:2_000_000]
+                    print("Tilda gallery:", response.status_code, "bytes", len(response.content),
+                          "gallery-marker", text.count("t-store__prod-popup__slider"),
+                          "schema", text.count("application/ld+json"))
+                response.raise_for_status()
+                if len(response.content) > 2_000_000:
+                    raise ValueError("Product page too large")
+            images = extract_gallery(response.text, primary)
+            if len(images) > 1:
+                return images, "product_page"
+        except (httpx.HTTPError, ValueError):
+            continue
+    return [primary], "primary_only"
 
 
 def format_for_gallery(images):
