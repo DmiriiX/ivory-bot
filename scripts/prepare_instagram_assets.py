@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage Instagram carousel images and silent Reels as durable GitHub assets.
+"""Stage Instagram carousel images, branded Stories and music Reels.
 
 Run from repository root in GitHub Actions. Writes only assets and an index,
 never posts to Instagram or touches Telegram/MAX state.
@@ -59,7 +59,8 @@ async def prepare(post, existing):
         print("Reel unavailable:", ident, type(exc).__name__)
     return {"title": post.get("title"), "image_count": len(photos),
             "gallery_source": source, "images": photos, "reel": reel,
-            "story": BASE_URL + story_path, "music": "Original IVORY ART instrumental ambient"}
+            "story": BASE_URL + story_path, "music": "Original IVORY ART instrumental ambient",
+            "reel_fps": 30 if reel else None}
 
 
 async def main(limit):
@@ -72,11 +73,13 @@ async def main(limit):
     # Bound requests per scheduled run; rotate across the catalog.
     cursor = ((datetime.now(timezone.utc).date().toordinal() * 12) % max(1, len(posts)))
     retries = [p for p in posts if identity(p) in records and
-               (not records[identity(p)].get("reel") or not records[identity(p)].get("story"))]
+               (not records[identity(p)].get("reel") or not records[identity(p)].get("story")
+                or records[identity(p)].get("reel_fps", 0) < 23)]
     scan = retries[:3] + [posts[(cursor + offset) % len(posts)] for offset in range(min(12, len(posts)))]
     for post in scan:
         ident = identity(post)
-        if ident in records and records[ident].get("reel") and records[ident].get("story"):
+        if (ident in records and records[ident].get("reel") and records[ident].get("story")
+                and records[ident].get("reel_fps", 0) >= 23):
             continue
         try:
             result = await prepare(post, records.get(ident))
