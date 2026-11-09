@@ -2,9 +2,6 @@ name: IVORY-ART paintings TG + MAX
 on:
   schedule:
     - cron: '0 8-16 * * *'
-  push:
-    paths:
-      - ".github/paintings-kickoff-2026-11-09.txt"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -29,27 +26,6 @@ jobs:
         run: python3 -m py_compile scripts/post_once.py
       - name: Run safety regression tests
         run: python3 -m unittest discover -s tests -v
-      - name: Guard one-time November 9 kickoff from duplicates
-        id: kickoff_guard
-        if: github.event_name == 'push'
-        run: |
-          python3 - <<'PY'
-          import json
-          from datetime import datetime
-          from zoneinfo import ZoneInfo
-          now = datetime.now(ZoneInfo("Europe/Moscow")).date()
-          state = json.load(open("state.json", encoding="utf-8"))
-          if str(now) != "2026-11-09":
-              raise SystemExit("This one-time kickoff is valid only on Nov 9, 2026")
-          last = state.get("last_post_at")
-          if last and datetime.fromisoformat(last).astimezone(ZoneInfo("Europe/Moscow")).date() == now:
-              import os
-              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  print("skip=true", file=f)
-              print("Today's painting already posted: kickoff skipped")
-          else:
-              print("Today's kickoff is eligible; partial delivery remains protected by state.json")
-          PY
       - name: Trust verified Russian Root CA required by MAX API
         run: |
           curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
@@ -64,7 +40,6 @@ jobs:
           sudo cp /tmp/russian_trusted_root_ca.pem /usr/local/share/ca-certificates/russian_trusted_root_ca.crt
           sudo update-ca-certificates
       - name: Publish Telegram + MAX
-        if: github.event_name != 'push' || steps.kickoff_guard.outputs.skip != 'true'
         env:
           BOT_KIND: paintings
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
@@ -72,7 +47,7 @@ jobs:
           MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
           MAX_CHANNEL_ID: ${{ secrets.MAX_CHANNEL_ID }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
-          FORCE_POST: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.force_post)) && '1' || '0' }}
+          FORCE_POST: ${{ github.event_name == 'workflow_dispatch' && inputs.force_post && '1' || '0' }}
         run: python3 scripts/post_once.py
       - name: Persist publication state even after partial failure
         if: always()
