@@ -379,6 +379,8 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
             "enabled": bool(history.get("enabled")),
             "next_check": next_instagram_check(enabled=bool(history.get("enabled"))),
             "next_publication": next_instagram_publication(history),
+            "rich_media_enabled": bool(history.get("rich_media_enabled", False)),
+            "rich_media_ready": 0,
             "metrics_last_checked": None,
             "metrics_posts": [],
 
@@ -390,6 +392,13 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
         })
     except Exception:
         status["enabled"] = False
+    try:
+        prepared_index, _ = await read_file("paintings", "instagram_assets.json")
+        status["rich_media_ready"] = sum(
+            isinstance(v.get("images"), list) and len(v["images"]) >= 2
+            for v in (prepared_index.get("artworks") or {}).values())
+    except Exception:
+        pass
     try:
         metrics_document, _ = await read_file("paintings", "instagram_metrics.json")
         metrics = decode_metrics_file(metrics_document)
@@ -478,6 +487,27 @@ async def instagram_toggle(change: InstagramSwitch, x_telegram_init_data: str = 
     await update_file("paintings", "instagram_state.json", history, sha,
                       "Admin: enable Instagram" if change.enabled else "Admin: pause Instagram")
     return {"enabled": change.enabled}
+
+
+class RichMediaSwitch(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/integrations/instagram/rich-media")
+async def instagram_rich_media_switch(change: RichMediaSwitch,
+                                       x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    index, _ = await read_file("paintings", "instagram_assets.json")
+    ready = sum(len(v.get("images") or []) >= 2
+                for v in (index.get("artworks") or {}).values())
+    if change.enabled and ready < 1:
+        raise HTTPException(409, "No tested multi-photo assets are prepared")
+    history, sha = await read_file("paintings", "instagram_state.json")
+    history["rich_media_enabled"] = change.enabled
+    await update_file("paintings", "instagram_state.json", history, sha,
+                      "Admin: " + ("enable" if change.enabled else "disable") +
+                      " Instagram multi-photo publishing [skip ci]")
+    return {"enabled": change.enabled, "ready": ready}
 
 
 @app.post("/internal/instagram/sync")
