@@ -1,8 +1,10 @@
 name: Sync newly published paintings to Instagram via Buffer
 on:
   schedule:
-    # Recovery campaign: daily check at 18:20 Moscow (feed on Tue/Thu/Sat/Sun).
-    - cron: "20 15 * * *"
+    # Multiple checks for GitHub cron delays, while backend ensures one post per date.
+    # 18:20 / 18:40 / 19:05 Moscow during the 18:15-19:45 campaign window.
+    - cron: "20,40 15 * * *"
+    - cron: "5 16 * * *"
   workflow_dispatch:
   push:
     paths:
