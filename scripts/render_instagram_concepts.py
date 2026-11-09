@@ -3,6 +3,7 @@
 
 Use existing untouched gallery paintings; never synthesize or retouch artwork.
 Creative previews only. This script does not send anything to Buffer or Instagram.
+All sample audio is generated from original notes (no licensed recordings).
 """
 from pathlib import Path
 import math, os, subprocess, sys, wave
