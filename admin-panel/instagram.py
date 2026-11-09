@@ -93,7 +93,7 @@ async def list_recent_instagram_posts(first=30):
     return matches
 
 
-async def verify_github_oidc(token):
+async def verify_github_oidc(token, workflow=WORKFLOW_REF):
     if not token:
         raise HTTPException(401, "GitHub OIDC token required")
     try:
@@ -109,7 +109,7 @@ async def verify_github_oidc(token):
     if not (str(claims.get("repository_id")) == REPOSITORY_ID
             and claims.get("repository") == "DmiriiX/ivory-bot"
             and claims.get("ref") == "refs/heads/main"
-            and claims.get("workflow_ref") == WORKFLOW_REF
+            and claims.get("workflow_ref") == workflow
             and claims.get("event_name") in ("schedule", "workflow_dispatch", "push")
             and claims.get("repository_owner") == "DmiriiX"):
         raise HTTPException(403, "Unauthorized GitHub workflow")
@@ -318,3 +318,36 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     records[item_id]["status"] = "accepted"
     await update_file("paintings", "instagram_state.json", state, new_sha, "Record Buffer accepted Instagram post")
     return {"ok": True, "id": item_id, "status": "accepted"}
+
+
+async def collect_post_metrics(records):
+    """Read-only experimental Buffer metrics; absence means unknown, never zero."""
+    results = {}
+    for artwork_id, record in records.items():
+        post_id = record.get("buffer_post_id")
+        if not post_id or record.get("status") not in ("sent", "accepted"):
+            continue
+        try:
+            data = await graphql(
+                """query($id: PostId!) {
+                  post(input: {id: $id}) {
+                    id status metrics { type name value unit } metricsUpdatedAt
+                  }
+                }""",
+                {"id": post_id},
+            )
+            item = data.get("post") or {}
+            result = {"status": item.get("status"),
+                      "metrics_updated_at": item.get("metricsUpdatedAt"),
+                      "metrics": {}}
+            for metric in item.get("metrics") or []:
+                kind = metric.get("type")
+                value = metric.get("value")
+                if kind and isinstance(value, (int, float)) and not isinstance(value, bool):
+                    result["metrics"][kind] = {"value": value,
+                                               "unit": metric.get("unit") or "count"}
+            results[artwork_id] = result
+        except Exception as exc:
+            results[artwork_id] = {"error": str(exc)[:180], "metrics": {},
+                                   "metrics_updated_at": None}
+    return results
