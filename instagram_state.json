@@ -30,7 +30,9 @@
       "status": "uncertain",
       "created_at": "2026-11-09T15:47:51.216785+00:00",
       "campaign": true,
-      "campaign_date": "2026-11-09"
+      "campaign_date": "2026-11-09",
+      "failure_type": "TypeError",
+      "failure_message": "unsupported operand type(s) for +: 'int' and 'NoneType'"
     }
   },
   "failed_attempts": [
