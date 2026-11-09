@@ -11,6 +11,22 @@ class RecoveryCampaignTests(unittest.TestCase):
         self.campaign = {"enabled": True, "start_date": "2026-11-10",
                          "end_date": "2026-12-09"}
 
+    def test_monday_november_ninth_kickoff_replaces_first_tuesday(self):
+        campaign = dict(self.campaign, start_date="2026-11-09",
+                        end_date="2026-12-08")
+        self.assertTrue(due_now(campaign, "feed",
+                                datetime(2026, 11, 9, 18, 20, tzinfo=MSK)))
+        self.assertFalse(due_now(campaign, "feed",
+                                 datetime(2026, 11, 10, 18, 20, tzinfo=MSK)))
+        dates = []
+        for day in range(9, 16):
+            if due_now(campaign, "feed",
+                       datetime(2026, 11, day, 18, 20, tzinfo=MSK)):
+                dates.append(day)
+        self.assertEqual(dates, [9, 12, 14, 15])
+        self.assertFalse(due_now(campaign, "feed",
+                                 datetime(2026, 12, 9, 18, 20, tzinfo=MSK)))
+
     def test_four_feed_days_per_week(self):
         actual = []
         for day in range(10, 17):
