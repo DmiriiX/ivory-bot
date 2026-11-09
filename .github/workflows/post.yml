@@ -50,6 +50,19 @@ jobs:
           else:
               print("Today's kickoff is eligible; partial delivery remains protected by state.json")
           PY
+      - name: Trust verified Russian Root CA required by MAX API
+        run: |
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+            -o /tmp/russian_trusted_root_ca.pem \
+            https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt
+          ACTUAL=$(openssl x509 -in /tmp/russian_trusted_root_ca.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          EXPECTED=D26D2D0231B7C39F92CC738512BA54103519E4405D68B5BD703E9788CA8ECF31
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "MAX CA certificate fingerprint verification failed"
+            exit 1
+          fi
+          sudo cp /tmp/russian_trusted_root_ca.pem /usr/local/share/ca-certificates/russian_trusted_root_ca.crt
+          sudo update-ca-certificates
       - name: Publish Telegram + MAX
         if: github.event_name != 'push' || steps.kickoff_guard.outputs.skip != 'true'
         env:
