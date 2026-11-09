@@ -19,6 +19,9 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     steps:
+      - name: Allow deployment to settle after test trigger
+        if: github.event_name == 'push'
+        run: sleep 75
       - name: Collect read-only Buffer insights via protected Render API
         env:
           API_URL: https://ivory-bot-h4gn.onrender.com/internal/instagram/metrics
