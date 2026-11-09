@@ -66,6 +66,16 @@ class InstagramSafetyTests(unittest.TestCase):
             self.assertNotIn("impressions", data["art1"]["metrics"])
         asyncio.run(trial())
 
+    def test_rich_carousel_and_reel_assets_are_explicit(self):
+        root = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
+        media = {"images": [root+"a-1.jpg", root+"a-2.jpg"], "reel": root+"a.mp4"}
+        self.assertEqual(len(instagram.rich_media_assets(media, "carousel")), 2)
+        self.assertEqual(len(instagram.rich_media_assets(media, "reel")), 1)
+        with self.assertRaises(ValueError):
+            instagram.rich_media_assets({"images":["https://example.com/a.jpg","https://example.com/b.jpg"]}, "carousel")
+        with self.assertRaises(ValueError):
+            instagram.rich_media_assets({"images":[root+"a-1.jpg"]}, "carousel")
+
     def test_non_https_photo_rejected_before_network(self):
         import asyncio
         async def trial():
