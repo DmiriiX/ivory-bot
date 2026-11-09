@@ -68,7 +68,10 @@ def next_instagram_check(now=None, enabled=True):
 
 
 def next_instagram_publication(history, now=None):
-    """Next eligible Instagram slot; depends on TG/MAX artwork availability."""
+    """Report campaign's four feed slots/week or legacy Instagram cadence."""
+    if (history.get("campaign") or {}).get("enabled", False):
+        from instagram_campaign import campaign_slot
+        return campaign_slot(history["campaign"], "feed", now)
     now = (now or datetime.now(MSK)).astimezone(MSK)
     if not history.get("enabled", False):
         return {"next_at": None, "reason": "paused"}
@@ -97,3 +100,10 @@ def next_instagram_publication(history, now=None):
                     "timezone": "Europe/Moscow",
                     "note": "Только при наличии новой картины, опубликованной в Telegram и MAX"}
     return {"next_at": None, "reason": "unavailable"}
+
+
+def next_instagram_story(history, now=None):
+    """Upcoming Instagram Story slot during the monthly recovery campaign."""
+    from instagram_campaign import campaign_slot
+    campaign = history.get("campaign") or {}
+    return campaign_slot(campaign, "story", now)
