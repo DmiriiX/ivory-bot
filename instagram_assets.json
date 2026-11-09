@@ -10,8 +10,15 @@
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-2.jpg",
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-3.jpg"
       ],
-      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050.mp4",
-      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-story.jpg",
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-cinematic.mp4",
+      "reel_style": "cinematic",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/28b174020ec70c69d3a66050-story-1.jpg",
+      "creative_version": 2,
       "music": "Original IVORY ART instrumental ambient",
       "reel_fps": 30
     },
@@ -23,8 +30,15 @@
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-1.jpg",
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-2.jpg"
       ],
-      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907.mp4",
-      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-story.jpg",
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-luxury.mp4",
+      "reel_style": "luxury",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/275a9c705656a9ce36125907-story-1.jpg",
+      "creative_version": 2,
       "music": "Original IVORY ART instrumental ambient",
       "reel_fps": 30
     },
@@ -36,8 +50,15 @@
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-1.jpg",
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-2.jpg"
       ],
-      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1.mp4",
-      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-story.jpg",
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-cinematic.mp4",
+      "reel_style": "cinematic",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/877c981e3b8d2d4d44e2d1c1-story-1.jpg",
+      "creative_version": 2,
       "music": "Original IVORY ART instrumental ambient",
       "reel_fps": 30
     },
@@ -50,8 +71,15 @@
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-2.jpg",
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-3.jpg"
       ],
-      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f.mp4",
-      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-story.jpg",
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-luxury.mp4",
+      "reel_style": "luxury",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/07cf3fcfca91eb5d4197b40f-story-1.jpg",
+      "creative_version": 2,
       "music": "Original IVORY ART instrumental ambient",
       "reel_fps": 30
     },
@@ -63,8 +91,15 @@
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-1.jpg",
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-2.jpg"
       ],
-      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea.mp4",
-      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-story.jpg",
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-cinematic.mp4",
+      "reel_style": "cinematic",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/e9fa2233ee541d5fce64a8ea-story-1.jpg",
+      "creative_version": 2,
       "music": "Original IVORY ART instrumental ambient",
       "reel_fps": 30
     },
@@ -77,8 +112,15 @@
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-2.jpg",
         "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-3.jpg"
       ],
-      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5.mp4",
-      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-story.jpg",
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-luxury.mp4",
+      "reel_style": "luxury",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/d23b2f272e3ebd9df85517b5-story-1.jpg",
+      "creative_version": 2,
       "music": "Original IVORY ART instrumental ambient",
       "reel_fps": 30
     }
