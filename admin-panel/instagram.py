@@ -320,6 +320,8 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     # Don't start a second submission if one is uncertain.
     if any(v.get("status") == "uncertain" for v in records.values()):
         return {"ok": False, "reason": "Uncertain delivery requires manual review"}
+    if any(v.get("status") == "accepted" for v in records.values()):
+        return {"ok": True, "reason": "Previous Buffer publication awaits delivery confirmation"}
     campaign = state.get("campaign") or {}
     in_campaign = bool(campaign.get("enabled"))
     now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
