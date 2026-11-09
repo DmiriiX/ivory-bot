@@ -12,5 +12,11 @@
     "dfc448216171e629b20e8c5a",
     "c4c1e41d8b62058571526ab4",
     "3b539193b85b606dcd1e043c"
-  ]
+  ],
+  "pending": {
+    "id": "d20d528697b86063e1408798",
+    "telegram": true,
+    "max": false,
+    "date": "2026-11-09"
+  }
 }
