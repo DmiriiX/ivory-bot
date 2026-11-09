@@ -8,7 +8,8 @@ from pathlib import Path
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from instagram_story import story_image
+from instagram_story import story_image, story_triptych
+from instagram_editorial import draw_frame
 from instagram_reel import original_ambient_audio
 
 
@@ -20,6 +21,26 @@ class CreativeSafetyTests(unittest.TestCase):
         image = Image.open(BytesIO(rendered))
         self.assertEqual(image.size, (1080, 1920))
         self.assertEqual(image.format, "JPEG")
+
+    def test_triptych_has_three_unique_artwork_preserving_frames(self):
+        source = BytesIO()
+        Image.new("RGB", (740, 490), "#a29680").save(source, "JPEG")
+        frames = story_triptych([source.getvalue(), source.getvalue()],
+                               "Original Artwork", "Artist", "60 × 80 см")
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(len(set(frames)), 3)
+        for jpeg in frames:
+            with Image.open(BytesIO(jpeg)) as img:
+                self.assertEqual(img.size, (1080, 1920))
+                self.assertEqual(img.format, "JPEG")
+
+    def test_luxury_and_cinematic_reels_use_distinct_frames(self):
+        art = Image.new("RGB", (580, 420), "#ab9582")
+        f1 = draw_frame(4, [art, art], "Artwork", "Artist", "cinematic")
+        f2 = draw_frame(4, [art, art], "Artwork", "Artist", "luxury")
+        self.assertEqual(f1.size, (720, 1280))
+        self.assertEqual(f2.size, (720, 1280))
+        self.assertNotEqual(f1.tobytes(), f2.tobytes())
 
     def test_original_ambient_soundtrack_contains_audio(self):
         with tempfile.TemporaryDirectory() as folder:
