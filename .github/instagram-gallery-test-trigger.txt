@@ -1,0 +1,1 @@
+Test safe read-only gallery discovery and media preparation - 2026-11-09
