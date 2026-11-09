@@ -1,1 +1,1 @@
-Test safe read-only gallery discovery and media preparation - 2026-11-09
+Second read-only Tilda multi-photo discovery diagnostic 2026-11-09
