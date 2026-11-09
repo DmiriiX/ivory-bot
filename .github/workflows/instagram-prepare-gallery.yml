@@ -29,7 +29,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       - name: Generate a small batch of media
-        run: python3 scripts/prepare_instagram_assets.py --limit 3
+        run: python3 scripts/prepare_instagram_assets.py --limit 6
       - name: Verify Reel video and original audio streams
         run: |
           for video in instagram-media/prepared/*.mp4; do
