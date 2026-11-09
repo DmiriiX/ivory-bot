@@ -5,7 +5,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from schedule_info import next_post, next_instagram_check, MSK
+from schedule_info import next_post, next_instagram_check, next_instagram_publication, MSK
 
 class UpcomingScheduleTests(unittest.TestCase):
     def test_paintings_next_eligible_date_and_deterministic_hour(self):
@@ -27,6 +27,22 @@ class UpcomingScheduleTests(unittest.TestCase):
         self.assertEqual(next_post("paintings",paused=True)["reason"],"paused")
         self.assertEqual(next_post("paintings",remaining=0)["reason"],"empty")
         self.assertEqual(next_post("paintings",pending={"id":"x"})["reason"],"pending")
+
+    def test_instagram_cadence_after_recent_sent_post(self):
+        history = {"enabled": True, "records": {
+            "art": {"status": "sent", "created_at": "2026-11-08T22:22:37+00:00"}}}
+        now = datetime(2026, 11, 9, 9, 15, tzinfo=MSK)
+        slot = next_instagram_publication(history, now=now)
+        self.assertEqual(slot["next_at"], "2026-11-12T18:15:00+03:00")
+        self.assertEqual(slot["reason"], "scheduled")
+
+    def test_instagram_held_when_delivery_unknown(self):
+        history = {"enabled": True, "records": {"a": {"status": "uncertain"}}}
+        self.assertEqual(next_instagram_publication(history)["reason"], "pending")
+
+    def test_instagram_held_until_buffer_confirms_delivery(self):
+        history = {"enabled": True, "records": {"a": {"status": "accepted"}}}
+        self.assertEqual(next_instagram_publication(history)["reason"], "pending")
 
     def test_instagram_check_is_not_publishing_promise(self):
         now=datetime(2026,11,9,17,55,tzinfo=MSK)
