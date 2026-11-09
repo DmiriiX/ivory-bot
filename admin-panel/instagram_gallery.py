@@ -6,7 +6,7 @@ A page with no confirmed gallery does not qualify as a multi-photo post.
 import json
 import re
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlsplit, unquote
+from urllib.parse import urlsplit, unquote
 
 import httpx
 
@@ -33,12 +33,10 @@ def approved_image_url(url):
 
 
 class GalleryParser(HTMLParser):
+    """Collect JSON-LD only; DOM images require a scoped selector."""
+
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.images = []
-        self._depth = 0
-        self._product_depth = 0
-        self._gallery_depth = 0
         self._script = False
         self._jsonld = []
         self._buffer = []
@@ -48,17 +46,6 @@ class GalleryParser(HTMLParser):
         if tag == "script" and attrs.get("type", "").lower() == "application/ld+json":
             self._script = True
             self._buffer = []
-        if tag == "meta" and attrs.get("property") == "og:image":
-            self._add(attrs.get("content"))
-        classes = attrs.get("class", "")
-        # Tilda store product detail and its slider are the only supported DOM sources.
-        if tag == "div" and ("t-store__prod" in classes or "js-store-prod" in classes):
-            self._product_depth += 1
-        if tag == "div" and ("t-slds__item" in classes or "t-store__prod-popup__slider" in classes):
-            self._gallery_depth += 1
-        if tag in ("img", "div", "a") and (self._product_depth or self._gallery_depth):
-            for key in ("data-original", "data-img-zoom-url", "data-img-zoom", "data-src", "src", "data-original-image"):
-                self._add(attrs.get(key))
 
     def handle_data(self, data):
         if self._script:
@@ -68,19 +55,10 @@ class GalleryParser(HTMLParser):
         if tag == "script" and self._script:
             self._script = False
             try:
-                raw = json.loads("".join(self._buffer))
-                self._jsonld.append(raw)
+                self._jsonld.append(json.loads("".join(self._buffer)))
             except (ValueError, TypeError):
                 pass
             self._buffer = []
-
-    def _add(self, url):
-        if not isinstance(url, str):
-            return
-        url = unquote(url.replace("&amp;", "&"))
-        safe = approved_image_url(url)
-        if safe and safe not in self.images:
-            self.images.append(safe)
 
 
 def product_schema_images(schemas):
@@ -109,7 +87,15 @@ def extract_gallery(html_text, primary):
     parser = GalleryParser()
     parser.feed(html_text[:2_000_000])
     schema = product_schema_images(parser._jsonld)
-    confirmed = schema or parser.images
+    confirmed = list(schema)
+    # Only actual product-gallery nodes, never unrelated page artwork.
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html_text[:2_000_000], "html.parser")
+    for element in soup.select(".t-store__prod-popup__slider img, .t-store__prod-popup__slider [data-original], .t-store__prod__slider img, .t-store__prod__slider [data-original]"):
+        for key in ("data-original", "data-img-zoom-url", "data-src", "src"):
+            value = approved_image_url(element.get(key))
+            if value and value not in confirmed:
+                confirmed.append(value)
     ordered = [primary] if approved_image_url(primary) else []
     for item in confirmed:
         if item not in ordered:
