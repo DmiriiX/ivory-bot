@@ -21,8 +21,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
 from instagram_gallery import discover_gallery, format_for_gallery
 from instagram_reel import make_reel
-from schedule_info import next_post, next_instagram_check, next_instagram_publication
-from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics
+from schedule_info import next_post, next_instagram_check, next_instagram_publication, next_instagram_story
+from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -379,6 +379,12 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
             "enabled": bool(history.get("enabled")),
             "next_check": next_instagram_check(enabled=bool(history.get("enabled"))),
             "next_publication": next_instagram_publication(history),
+            "next_story": next_instagram_story(history),
+            "campaign": history.get("campaign") or {},
+            "story_sent": sum(v.get("status") == "sent"
+                              for v in (history.get("story_records") or {}).values()),
+            "story_accepted": sum(v.get("status") == "accepted"
+                                  for v in (history.get("story_records") or {}).values()),
             "rich_media_enabled": bool(history.get("rich_media_enabled", False)),
             "rich_media_ready": 0,
             "metrics_last_checked": None,
@@ -516,6 +522,16 @@ async def instagram_sync(request: Request, authorization: str = Header(default="
         raise HTTPException(401, "Signed GitHub OIDC token required")
     await verify_github_oidc(authorization[7:])
     return await sync_instagram(read_file, update_file, identity, gh)
+
+
+@app.post("/internal/instagram/stories")
+async def instagram_stories_sync(authorization: str = Header(default="")):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Signed GitHub OIDC token required")
+    await verify_github_oidc(
+        authorization[7:],
+        workflow="DmiriiX/ivory-bot/.github/workflows/instagram-stories.yml@refs/heads/main")
+    return await sync_instagram_story(read_file, update_file, identity)
 
 
 @app.post("/internal/instagram/metrics")
