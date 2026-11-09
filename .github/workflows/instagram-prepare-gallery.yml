@@ -30,6 +30,13 @@ jobs:
           sudo apt-get install -y -qq ffmpeg
       - name: Generate a small batch of media
         run: python3 scripts/prepare_instagram_assets.py --limit 3
+      - name: Verify Reel video and original audio streams
+        run: |
+          for video in instagram-media/prepared/*.mp4; do
+            [ -f "$video" ] || continue
+            ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$video" | grep -q 'codec_name=h264'
+            ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$video" | grep -q 'codec_name=aac'
+          done
       - name: Store stable assets without triggering publisher workflows
         run: |
           git config user.name 'github-actions[bot]'
