@@ -1,0 +1,35 @@
+name: Prepare Instagram galleries and Reels (no publishing)
+on:
+  schedule:
+    - cron: "20 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ivory-art-instagram-prepared-assets
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install media preparation tools
+        run: |
+          python3 -m pip install -r admin-panel/requirements.txt
+      - name: Generate a small batch of media
+        run: python3 scripts/prepare_instagram_assets.py --limit 3
+      - name: Store stable assets without triggering publisher workflows
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add instagram_assets.json instagram-media/prepared/
+          if ! git diff --cached --quiet; then
+            git commit -m 'Prepare verified Instagram multi-photo media [skip ci]'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
