@@ -1,4 +1,4 @@
-"""Generate a conservative, silent Instagram Reel from real product photographs.
+"""Generate a minimal, music-backed Instagram Reel from real artwork photographs.
 
 No AI-generated fake angles or altered painting content. Rendered on demand;
 this is a preview only, not a publicly hosted Buffer asset.
@@ -8,6 +8,9 @@ import os
 import shutil
 import subprocess
 import tempfile
+import math
+import wave
+import struct
 from pathlib import Path
 from io import BytesIO
 
@@ -27,6 +30,46 @@ def frame_image(image_bytes):
         return canvas
 
 
+
+def original_ambient_audio(destination, duration):
+    """Generate original instrumental audio, no third-party music or rights claims.
+
+    Warm synth pads and softly plucked notes based on a simple original pattern.
+    Written from scratch using Python's standard library. Commercial use permitted.
+    """
+    sample_rate = 22050
+    # This is an original soundscape, not a recording or cover.
+    progression = [(220.0, 261.63, 329.63), (196.0, 246.94, 293.66),
+                   (174.61, 220.0, 261.63), (196.0, 246.94, 329.63)]
+    total = int(duration * sample_rate)
+    with wave.open(str(destination), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(sample_rate)
+        block = bytearray()
+        for i in range(total):
+            t = i / sample_rate
+            step = min(3, int(t / max(0.1, duration / 4)))
+            notes = progression[step]
+            # Rounded, layered pad with slow vibrato and low amplitude.
+            pad = sum(math.sin(2 * math.pi * n * t + 0.06 * math.sin(2 * math.pi * .21 * t))
+                      for n in notes) / 3
+            # Bell-like notes, short and restrained.
+            pulse_pos = t % 1.5
+            note = notes[int(t / 1.5) % 3] * 2
+            pluck = (math.sin(2 * math.pi * note * t)
+                     + .28 * math.sin(2 * math.pi * note * 2 * t)) * math.exp(-2.5 * pulse_pos)
+            fade = min(1.0, t / 1.4, max(0.0, (duration - t) / 1.5))
+            val = max(-1.0, min(1.0, (pad * .15 + pluck * .095) * fade))
+            block += struct.pack("<h", int(val * 32767))
+            if len(block) >= 65536:
+                output.writeframesraw(block)
+                block.clear()
+        if block:
+            output.writeframesraw(block)
+
+
+
 def encode_reel(files, output):
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg is not installed")
@@ -44,10 +87,14 @@ def encode_reel(files, output):
         )
     filters.append("".join(f"[v{i}]" for i in range(count)) +
                    f"concat=n={count}:v=1:a=0[out]")
+    audio_file = output.parent / "ivory-original-ambient.wav"
+    original_ambient_audio(audio_file, count * 3)
+    args += ["-i", str(audio_file)]
     args += ["-filter_complex", ";".join(filters),
              "-map", "[out]", "-r", str(FPS), "-c:v", "libx264",
              "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
-             "-movflags", "+faststart", "-an", str(output)]
+             "-movflags", "+faststart", "-map", f"{count}:a:0",
+             "-c:a", "aac", "-b:a", "128k", "-shortest", str(output)]
     subprocess.run(args, check=True, timeout=100, capture_output=True)
     if not output.exists() or output.stat().st_size > 35_000_000:
         raise ValueError("Invalid reel output")
