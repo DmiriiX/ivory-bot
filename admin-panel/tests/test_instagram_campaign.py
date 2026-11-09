@@ -55,6 +55,14 @@ class RecoveryCampaignTests(unittest.TestCase):
             self.assertEqual(feed_format(records, {"reel", "carousel"}),
                              ("carousel", "reel", "carousel")[i])
 
+    def test_legacy_instagram_records_without_campaign_are_ignored(self):
+        records = {
+            "historic1": {"status": "sent"},
+            "historic2": {"status": "sent", "campaign": None},
+            "historic3": {"status": "sent", "campaign": False},
+        }
+        self.assertEqual(feed_format(records, {"reel", "carousel"}), "reel")
+
     def test_no_reel_fallback_to_carousel(self):
         self.assertEqual(feed_format({}, {"carousel"}), "carousel")
 
