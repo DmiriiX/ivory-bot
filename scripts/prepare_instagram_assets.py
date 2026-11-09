@@ -58,7 +58,11 @@ async def main(limit):
     index = json.loads(INDEX_PATH.read_text(encoding="utf-8")) if INDEX_PATH.exists() else {"version": 1, "artworks": {}}
     records = index.setdefault("artworks", {})
     handled = 0
-    for post in posts:
+    # Bound requests per scheduled run; rotate across the catalog.
+    cursor = int(index.get("scan_cursor", 0)) % max(1, len(posts))
+    for offset in range(min(12, len(posts))):
+        post = posts[(cursor + offset) % len(posts)]
+        index["scan_cursor"] = (cursor + offset + 1) % len(posts)
         ident = identity(post)
         if ident in records:
             continue
