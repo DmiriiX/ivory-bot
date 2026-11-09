@@ -171,7 +171,7 @@ def product_uid(post):
 async def load_catalog_galleries():
     """Read Tilda public store catalog, bounded pagination and 15-min cache."""
     import time
-    if time.monotonic() - _CATALOG_CACHE["at"] < 900:
+    if _CATALOG_CACHE["at"] and time.monotonic() - _CATALOG_CACHE["at"] < 900:
         return _CATALOG_CACHE["galleries"]
     galleries = {}
     async with httpx.AsyncClient(timeout=25, follow_redirects=False) as client:
