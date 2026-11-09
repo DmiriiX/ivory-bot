@@ -69,6 +69,8 @@ def next_instagram_check(now=None, enabled=True):
 
 def next_instagram_publication(history, now=None):
     """Report campaign's four feed slots/week or legacy Instagram cadence."""
+    if not history.get("enabled", False):
+        return {"next_at": None, "reason": "paused"}
     if (history.get("campaign") or {}).get("enabled", False):
         from instagram_campaign import campaign_slot
         return campaign_slot(history["campaign"], "feed", now)
@@ -105,5 +107,7 @@ def next_instagram_publication(history, now=None):
 def next_instagram_story(history, now=None):
     """Upcoming Instagram Story slot during the monthly recovery campaign."""
     from instagram_campaign import campaign_slot
+    if not history.get("enabled", False):
+        return {"next_at": None, "reason": "paused"}
     campaign = history.get("campaign") or {}
     return campaign_slot(campaign, "story", now)
