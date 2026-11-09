@@ -75,7 +75,7 @@ async def main(limit):
     retries = [p for p in posts if identity(p) in records and
                (not records[identity(p)].get("reel") or not records[identity(p)].get("story")
                 or records[identity(p)].get("reel_fps", 0) < 23)]
-    scan = retries[:3] + [posts[(cursor + offset) % len(posts)] for offset in range(min(12, len(posts)))]
+    scan = retries[:12] + [posts[(cursor + offset) % len(posts)] for offset in range(min(12, len(posts)))]
     for post in scan:
         ident = identity(post)
         if (ident in records and records[ident].get("reel") and records[ident].get("story")
@@ -102,4 +102,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=3)
     args = parser.parse_args()
-    asyncio.run(main(max(1, min(args.limit, 5))))
+    asyncio.run(main(max(1, min(args.limit, 12))))
