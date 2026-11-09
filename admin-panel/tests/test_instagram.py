@@ -51,6 +51,21 @@ class InstagramSafetyTests(unittest.TestCase):
         self.assertTrue(all(p["title"] in TITLES for p in posts))
         self.assertTrue(all(p["artist"] in ARTISTS for p in posts))
 
+    def test_metrics_only_include_values_returned_by_buffer(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+        async def trial():
+            payload = {"post": {"id": "buffer1", "status": "sent",
+                "metricsUpdatedAt": "2026-11-09T07:00:00Z",
+                "metrics": [{"type": "reach", "name": "Reach", "value": 55,
+                             "unit": "count"}]}}
+            with patch.object(instagram, "graphql", new=AsyncMock(return_value=payload)):
+                data = await instagram.collect_post_metrics({"art1": {
+                    "buffer_post_id": "buffer1", "status": "sent"}})
+            self.assertEqual(data["art1"]["metrics"]["reach"]["value"], 55)
+            self.assertNotIn("impressions", data["art1"]["metrics"])
+        asyncio.run(trial())
+
     def test_non_https_photo_rejected_before_network(self):
         import asyncio
         async def trial():
