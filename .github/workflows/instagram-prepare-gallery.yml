@@ -3,9 +3,6 @@ on:
   schedule:
     - cron: "20 5 * * *"
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/instagram-video-fps-test.txt"
 
 permissions:
   contents: write
