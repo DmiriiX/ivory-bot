@@ -140,6 +140,7 @@ function planned(slot){
  if(!slot)return "Нет данных";
  const reason=slot.reason;
  if(reason==="paused")return "Автопубликация приостановлена";
+  if(reason==="finished")return "Кампания завершена 9 декабря";
  if(reason==="empty")return "Очередь закончилась";
  if(reason==="pending")return "Ожидается завершение предыдущего поста";
  if(!slot.next_at)return "Время пока неизвестно";
