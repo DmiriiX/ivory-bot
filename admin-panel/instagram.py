@@ -12,6 +12,7 @@ import re
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from schedule_info import next_instagram_publication
+from instagram_campaign import due_now, feed_format
 import base64
 from media import normalized_image
 from instagram_translations import TITLES, ARTISTS
@@ -246,18 +247,24 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
       }
     }
     """
-    if media is not None:
+    if kind == "story":
+        story_url = (media or {}).get("story") or ""
+        prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
+        if not story_url.startswith(prefix) or not story_url.endswith("-story.jpg"):
+            raise ValueError("Prepared Story is missing")
+        assets = [{"image": {"url": story_url}}]
+    elif media is not None:
         assets = rich_media_assets(media, kind)
     else:
         assets = [{"image": {"url": image_url}}]
         kind = "post"
     payload = {
-        "text": post_caption(post),
+        "text": "" if kind == "story" else post_caption(post),
         "channelId": channel_id,
         "schedulingType": "automatic",
         "mode": "shareNow",
         "assets": assets,
-        "metadata": {"instagram": {"type": "reel" if kind == "reel" else "post", "shouldShareToFeed": True}},
+        "metadata": {"instagram": {"type": kind, "shouldShareToFeed": kind != "story"}},
     }
     data = await graphql(mutation, {"input": payload})
     result = data.get("createPost") or {}
