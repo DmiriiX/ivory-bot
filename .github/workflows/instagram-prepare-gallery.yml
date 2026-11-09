@@ -3,9 +3,6 @@ on:
   schedule:
     - cron: "20 5 * * *"
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/month-campaign-media-test.txt"
 
 permissions:
   contents: write
