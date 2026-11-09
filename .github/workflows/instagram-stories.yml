@@ -1,8 +1,10 @@
 name: Instagram Ivory Art Stories (30-day campaign)
 on:
   schedule:
-    # 19:20 Moscow daily; backend allows only Mon/Wed/Fri 19:15 + 90 minutes
-    - cron: "20 16 * * *"
+    # Redundant checks at 19:20, 19:40 and 20:10 Moscow.
+    # Backend allows only Mon/Wed/Fri 19:15-20:45 and frame-level dedupe.
+    - cron: "20,40 16 * * *"
+    - cron: "10 17 * * *"
   workflow_dispatch:
 
 permissions:
