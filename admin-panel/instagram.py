@@ -251,7 +251,7 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
         prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
         story_url = (media or {}).get("story") or ""
         if (not story_url.startswith(prefix)
-                or not (story_url.endswith("-story.jpg") or re.search(r"-story-[123]\\.jpg$", story_url))):
+                or not (story_url.endswith("-story.jpg") or any(story_url.endswith(f"-story-{n}.jpg") for n in (1, 2, 3)))):
             raise ValueError("Prepared Story is missing")
         assets = [{"image": {"url": story_url}}]
     elif media is not None:
