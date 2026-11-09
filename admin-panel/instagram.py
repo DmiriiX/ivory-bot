@@ -450,6 +450,30 @@ async def sync_instagram_story(read_file, update_file, identity):
 
     today = now_msk.date().isoformat()
     records = state.setdefault("story_records", {})
+    # Reconcile earlier Buffer Story deliveries for honest panel statistics.
+    # Never count accepted-as-sent unless Buffer confirms "sent".
+    changed = False
+    old_accepted = [(key, v) for key, v in records.items()
+                    if v.get("status") == "accepted" and v.get("buffer_post_id")
+                    and v.get("campaign_date") != today]
+    for key, old in old_accepted[:8]:
+        try:
+            remote = await get_buffer_status(old["buffer_post_id"])
+            status = remote.get("status")
+            if status in ("sent", "error", "failed"):
+                old["status"] = status
+                old["external_link"] = remote.get("externalLink")
+                old["checked_at"] = datetime.now(timezone.utc).isoformat()
+                changed = True
+        except Exception:
+            # Keep the original accepted record if the status check fails.
+            pass
+    if changed:
+        updated = await update_file(
+            "paintings", "instagram_state.json", state, sha,
+            "Reconcile earlier Instagram Story delivery statuses [skip ci]")
+        sha = (updated.get("content") or {}).get("sha") or (
+            await read_file("paintings", "instagram_state.json"))[1]
     # One attempted series per date; never silently substitute a second artwork.
     today_records = [v for v in records.values()
                      if v.get("campaign_date") == today]
