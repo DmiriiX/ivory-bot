@@ -24,15 +24,6 @@
       "buffer_status": "sent",
       "external_link": "https://www.instagram.com/p/Dff0coXlWI_/",
       "checked_at": "2026-11-08T22:24:46.004370+00:00"
-    },
-    "877c981e3b8d2d4d44e2d1c1": {
-      "title": "Жаркое лето",
-      "status": "uncertain",
-      "created_at": "2026-11-09T15:47:51.216785+00:00",
-      "campaign": true,
-      "campaign_date": "2026-11-09",
-      "failure_type": "TypeError",
-      "failure_message": "unsupported operand type(s) for +: 'int' and 'NoneType'"
     }
   },
   "failed_attempts": [
@@ -78,6 +69,18 @@
       "artwork_id": "877c981e3b8d2d4d44e2d1c1",
       "reason": "Read-only Buffer audit at 15:46Z confirmed zero matching posts after failed call; retry permitted with error logging",
       "reconciled_at": "2026-11-09T15:46:13Z"
+    },
+    {
+      "title": "Жаркое лето",
+      "status": "uncertain",
+      "created_at": "2026-11-09T15:47:51.216785+00:00",
+      "campaign": true,
+      "campaign_date": "2026-11-09",
+      "failure_type": "TypeError",
+      "failure_message": "unsupported operand type(s) for +: 'int' and 'NoneType'",
+      "artwork_id": "877c981e3b8d2d4d44e2d1c1",
+      "reconciled_at": "2026-11-09T15:49:00Z",
+      "reason": "Deterministic Python TypeError in feed_format before Buffer network call, regression fixed"
     }
   ],
   "rich_media_enabled": true,
