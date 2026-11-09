@@ -76,6 +76,23 @@ class InstagramSafetyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             instagram.rich_media_assets({"images":[root+"a-1.jpg"]}, "carousel")
 
+    def test_story_payload_uses_prepared_image_not_interactive_stickers(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+        async def test():
+            base = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
+            answer = {"createPost": {"post": {"id": "test-post", "status": "accepted", "channelId": "channel"}}}
+            client = AsyncMock(return_value=answer)
+            with patch.object(instagram, "graphql", new=client):
+                await instagram.create_buffer_post("channel", {"photo": "https://static.tildacdn.com/p.jpg"}, None,
+                                                   media={"story": base+"item-story.jpg"}, kind="story")
+            sent = client.call_args[0][1]["input"]
+            self.assertEqual(sent["metadata"]["instagram"]["type"], "story")
+            self.assertEqual(len(sent["assets"]), 1)
+            self.assertEqual(sent["text"], "")
+            self.assertNotIn("stickerFields", sent["metadata"]["instagram"])
+        asyncio.run(test())
+
     def test_non_https_photo_rejected_before_network(self):
         import asyncio
         async def trial():
