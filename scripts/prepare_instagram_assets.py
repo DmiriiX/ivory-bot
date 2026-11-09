@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "admin-panel"))
 from instagram_gallery import discover_gallery, product_uid
 from instagram_reel import make_reel
+from instagram_story import story_image
+from instagram_translations import TITLES, ARTISTS
 from media import normalized_image
 
 BASE_URL = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/"
@@ -41,6 +43,11 @@ async def prepare(post, existing):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(await normalized_image(url))
         photos.append(BASE_URL + filename)
+    story_path = f"instagram-media/prepared/{ident}-story.jpg"
+    story_bytes = story_image(await normalized_image(images[0]),
+                               TITLES.get(post.get("title"), "Original Artwork"),
+                               ARTISTS.get(post.get("artist"), "IVORY ART Gallery"))
+    (ROOT / story_path).write_bytes(story_bytes)
     reel = None
     try:
         video = await make_reel(images[:4])
@@ -51,7 +58,8 @@ async def prepare(post, existing):
         # A carousel may still be usable even when video preparation fails.
         print("Reel unavailable:", ident, type(exc).__name__)
     return {"title": post.get("title"), "image_count": len(photos),
-            "gallery_source": source, "images": photos, "reel": reel}
+            "gallery_source": source, "images": photos, "reel": reel,
+            "story": BASE_URL + story_path, "music": "Original IVORY ART instrumental ambient"}
 
 
 async def main(limit):
@@ -63,11 +71,12 @@ async def main(limit):
     handled = 0
     # Bound requests per scheduled run; rotate across the catalog.
     cursor = ((datetime.now(timezone.utc).date().toordinal() * 12) % max(1, len(posts)))
-    retries = [p for p in posts if identity(p) in records and not records[identity(p)].get("reel")]
+    retries = [p for p in posts if identity(p) in records and
+               (not records[identity(p)].get("reel") or not records[identity(p)].get("story"))]
     scan = retries[:3] + [posts[(cursor + offset) % len(posts)] for offset in range(min(12, len(posts)))]
     for post in scan:
         ident = identity(post)
-        if ident in records and records[ident].get("reel"):
+        if ident in records and records[ident].get("reel") and records[ident].get("story"):
             continue
         try:
             result = await prepare(post, records.get(ident))
