@@ -63,10 +63,11 @@ async def main(limit):
     handled = 0
     # Bound requests per scheduled run; rotate across the catalog.
     cursor = ((datetime.now(timezone.utc).date().toordinal() * 12) % max(1, len(posts)))
-    for offset in range(min(12, len(posts))):
-        post = posts[(cursor + offset) % len(posts)]
+    retries = [p for p in posts if identity(p) in records and not records[identity(p)].get("reel")]
+    scan = retries[:3] + [posts[(cursor + offset) % len(posts)] for offset in range(min(12, len(posts)))]
+    for post in scan:
         ident = identity(post)
-        if ident in records:
+        if ident in records and records[ident].get("reel"):
             continue
         try:
             result = await prepare(post, records.get(ident))
