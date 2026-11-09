@@ -31,7 +31,7 @@ def frame_image(image_bytes):
 
 
 
-def original_ambient_audio(destination, duration):
+def original_ambient_audio(destination, duration, mood='cinematic'):
     """Generate original instrumental audio, no third-party music or rights claims.
 
     Warm synth pads and softly plucked notes based on a simple original pattern.
@@ -39,8 +39,17 @@ def original_ambient_audio(destination, duration):
     """
     sample_rate = 22050
     # This is an original soundscape, not a recording or cover.
-    progression = [(220.0, 261.63, 329.63), (196.0, 246.94, 293.66),
-                   (174.61, 220.0, 261.63), (196.0, 246.94, 329.63)]
+    if mood == "luxury":
+        # Darker, slower palette: original minor/modal instrumental progression.
+        progression = [(174.61, 220.0, 261.63), (164.81, 196.0, 246.94),
+                       (146.83, 196.0, 220.0), (164.81, 220.0, 261.63)]
+        beat, pluck_level = 1.9, .062
+    elif mood == "cinematic":
+        progression = [(220.0, 261.63, 329.63), (196.0, 246.94, 293.66),
+                       (174.61, 220.0, 261.63), (196.0, 246.94, 329.63)]
+        beat, pluck_level = 1.5, .095
+    else:
+        raise ValueError("Unknown instrumental mood")
     total = int(duration * sample_rate)
     with wave.open(str(destination), "wb") as output:
         output.setnchannels(1)
@@ -55,12 +64,12 @@ def original_ambient_audio(destination, duration):
             pad = sum(math.sin(2 * math.pi * n * t + 0.06 * math.sin(2 * math.pi * .21 * t))
                       for n in notes) / 3
             # Bell-like notes, short and restrained.
-            pulse_pos = t % 1.5
-            note = notes[int(t / 1.5) % 3] * 2
+            pulse_pos = t % beat
+            note = notes[int(t / beat) % 3] * 2
             pluck = (math.sin(2 * math.pi * note * t)
                      + .28 * math.sin(2 * math.pi * note * 2 * t)) * math.exp(-2.5 * pulse_pos)
             fade = min(1.0, t / 1.4, max(0.0, (duration - t) / 1.5))
-            val = max(-1.0, min(1.0, (pad * .15 + pluck * .095) * fade))
+            val = max(-1.0, min(1.0, (pad * .15 + pluck * pluck_level) * fade))
             block += struct.pack("<h", int(val * 32767))
             if len(block) >= 65536:
                 output.writeframesraw(block)
