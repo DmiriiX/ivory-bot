@@ -10,6 +10,8 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from schedule_info import next_instagram_publication
 import base64
 from media import normalized_image
 from instagram_translations import TITLES, ARTISTS
@@ -267,6 +269,16 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     # Don't start a second submission if one is uncertain.
     if any(v.get("status") == "uncertain" for v in records.values()):
         return {"ok": False, "reason": "Uncertain delivery requires manual review"}
+    # Restrict Instagram to a single evening slot every 3 calendar days.
+    # Telegram and MAX retain their independent schedule.
+    now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
+    today_slot = next_instagram_publication(
+        state, now=now_msk.replace(hour=18, minute=14, second=0, microsecond=0))
+    if (now_msk.hour != 18 or now_msk.minute < 15
+            or not today_slot.get("next_at")
+            or datetime.fromisoformat(today_slot["next_at"]).date() != now_msk.date()):
+        return {"ok": True, "reason": "Instagram cadence: next publishing slot",
+                "next_publication": next_instagram_publication(state)}
     # A one-time admin-approved test may reuse one historically sent painting on Instagram,
     # but only when its ID is explicitly present in the state and no Instagram record exists.
     one_shot_id = state.get("test_post_id")
