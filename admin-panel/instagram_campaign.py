@@ -14,8 +14,8 @@ STORY_TIME = time(19, 15)
 
 
 def campaign_window(state, now=None):
-    start = date.fromisoformat(state.get("start_date", "2026-11-10"))
-    end = date.fromisoformat(state.get("end_date", "2026-12-09"))
+    start = date.fromisoformat(state.get("start_date", "2026-11-09"))
+    end = date.fromisoformat(state.get("end_date", "2026-12-08"))
     if (end - start).days > 31 or end < start:
         raise ValueError("Invalid monthly campaign period")
     return start, end
@@ -35,7 +35,14 @@ def campaign_slot(state, kind="feed", now=None):
         day = max(start, now.date()) + timedelta(days=offset)
         if day > end:
             break
-        if day.weekday() not in weekdays:
+        # Launch Monday Nov 9 instead of Tuesday Nov 10:
+        # exactly four feed posts during the first calendar week.
+        kickoff = kind == "feed" and start == date(2026, 11, 9)
+        if kickoff and day == start:
+            pass
+        elif kickoff and day == start + timedelta(days=1):
+            continue
+        elif day.weekday() not in weekdays:
             continue
         slot = datetime.combine(day, tm, tzinfo=MSK)
         if slot + timedelta(minutes=90) > now:
