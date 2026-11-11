@@ -93,16 +93,21 @@ def story_triptych(photos, title, artist, dimensions=""):
         elif slide==2:
             # One faithful photograph, with restrained editorial typography.
             # No AI painting generation, collages or synthetic brushstrokes.
-            photo=detail.copy()
-            # Preserve the entire genuine detail photograph and its natural
-            # proportions rather than forcing an arbitrary two-panel crop.
+            # True detail: crop only genuine pixels from the original art
+            # photograph. The second catalog photo may show a room or frame
+            # rather than actual paint details, so avoid using it here.
+            crop_w=int(main.width*0.60)
+            crop_h=int(main.height*0.62)
+            x0=min(main.width-crop_w, max(0,int(main.width*0.50)))
+            y0=min(main.height-crop_h, max(0,int(main.height*0.20)))
+            photo=main.crop((x0,y0,x0+crop_w,y0+crop_h))
             photo.thumbnail((900,1190),Image.Resampling.LANCZOS)
             x=(1080-photo.width)//2
             y=304+(1190-photo.height)//2
             canvas.paste(photo,(x,y))
             d=ImageDraw.Draw(canvas)
             d.line((72,1517,1008,1517),fill="#61543b",width=2)
-            d.text((75,1564),"A CLOSER LOOK",font=_font(31),fill="#f2e3bc")
+            d.text((75,1564),"THE ART OF DETAILS",font=_font(31),fill="#f2e3bc")
             title=str(title or "Original Artwork")[:115]
             artist=str(artist or "IVORY ART Gallery")[:90]
             d.text((75,1635),title,font=_fit_text(title,46,925),fill="#f6f0e3")
