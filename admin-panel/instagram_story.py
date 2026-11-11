@@ -78,7 +78,7 @@ def story_triptych(photos, title, artist, dimensions=""):
         d=ImageDraw.Draw(canvas)
         d.text((72,80),"IVORY ART",font=_font(63),fill="#f2e3bc")
         d.text((76,181),"G A L L E R Y",font=_font(22,False),fill="#c6b997")
-        d.text((920,109),f"0{slide} / 03",font=_font(23,False),fill="#f2e3bc")
+        d.text((800,118),("ARTWORK" if slide==1 else "DETAIL" if slide==2 else "DISCOVER"),font=_font(23,False),fill="#f2e3bc")
         d.line((72,248,1008,248),fill="#61543b",width=2)
         if slide==1:
             photo=main.copy()
@@ -91,22 +91,29 @@ def story_triptych(photos, title, artist, dimensions=""):
             d.text((74,1624),title,font=_fit_text(title,52,923),fill="#f6f0e3")
             d.text((74,1720),artist,font=_fit_text(artist,31,920,False),fill="#cfc3ad")
         elif slide==2:
-            # Crops show authentic photo detail; never synthesize new painting.
-            for pos,(img,focus) in enumerate(((main,.2),(detail,.78))):
-                w,h=920,564
-                scale=max(w/img.width,h/img.height)*1.08
-                iw,ih=int(img.width*scale),int(img.height*scale)
-                frame=img.resize((iw,ih),Image.Resampling.LANCZOS)
-                ox=min(max(0,int((iw-w)*focus)),iw-w)
-                oy=(ih-h)//2
-                frame=frame.crop((ox,oy,ox+w,oy+h))
-                canvas.paste(frame,(80,302+pos*590))
+            # One faithful photograph, with restrained editorial typography.
+            # No AI painting generation, collages or synthetic brushstrokes.
+            # True detail: crop only genuine pixels from the original art
+            # photograph. The second catalog photo may show a room or frame
+            # rather than actual paint details, so avoid using it here.
+            crop_w=int(main.width*0.60)
+            crop_h=int(main.height*0.62)
+            x0=min(main.width-crop_w, max(0,int(main.width*0.50)))
+            y0=min(main.height-crop_h, max(0,int(main.height*0.20)))
+            photo=main.crop((x0,y0,x0+crop_w,y0+crop_h))
+            scale=min(900/photo.width,1190/photo.height)
+            photo=photo.resize((max(1,round(photo.width*scale)),
+                                max(1,round(photo.height*scale))),Image.Resampling.LANCZOS)
+            x=(1080-photo.width)//2
+            y=304+(1190-photo.height)//2
+            canvas.paste(photo,(x,y))
             d=ImageDraw.Draw(canvas)
-            d.text((76,1550),"THE ART IS IN",font=_font(43),fill="#f2e3bc")
-            d.text((76,1620),"THE DETAILS",font=_font(53),fill="#f2e3bc")
-            dimension=str(dimensions or "")[:84]
-            if dimension:
-                d.text((77,1710),dimension,font=_fit_text(dimension,27,920,False),fill="#d3cab8")
+            d.line((72,1517,1008,1517),fill="#61543b",width=2)
+            d.text((75,1564),"THE ART OF DETAILS",font=_font(31),fill="#f2e3bc")
+            title=str(title or "Original Artwork")[:115]
+            artist=str(artist or "IVORY ART Gallery")[:90]
+            d.text((75,1635),title,font=_fit_text(title,46,925),fill="#f6f0e3")
+            d.text((76,1725),artist,font=_fit_text(artist,27,920,False),fill="#cfc3ad")
         else:
             photo=main.copy()
             photo.thumbnail((850,1070),Image.Resampling.LANCZOS)

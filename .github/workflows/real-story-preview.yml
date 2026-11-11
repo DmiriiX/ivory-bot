@@ -1,0 +1,42 @@
+name: Render real-painting Story previews (never publishes)
+on:
+  push:
+    paths:
+      - ".github/real-story-preview-trigger.txt"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ivory-art-real-story-preview
+  cancel-in-progress: false
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install image renderer
+        run: python3 -m pip install Pillow==11.3.0
+      - name: Render artwork-only Stories
+        run: python3 scripts/preview_real_stories.py
+      - name: Confirm authentic 1080 x 1920 JPEG output
+        run: |
+          python3 - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          for p in sorted(Path("instagram-media/demo").glob("venice-real-story-*.jpg")):
+              im=Image.open(p)
+              assert im.size==(1080,1920), (p,im.size)
+              assert p.stat().st_size>30000
+              print("VERIFIED",p,im.size,p.stat().st_size)
+          PY
+      - name: Save preview files on working branch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add instagram-media/demo/venice-real-story-*.jpg
+          if ! git diff --cached --quiet; then
+            git commit -m "Add real-photograph Venice Story previews [skip ci]"
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+          fi
