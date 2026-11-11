@@ -5,7 +5,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from schedule_info import next_post, next_instagram_check, next_instagram_publication, MSK
+from schedule_info import next_post, next_instagram_check, next_instagram_publication, next_instagram_story, MSK
 
 class UpcomingScheduleTests(unittest.TestCase):
     def test_paintings_next_eligible_date_and_deterministic_hour(self):
@@ -43,6 +43,26 @@ class UpcomingScheduleTests(unittest.TestCase):
     def test_instagram_held_until_buffer_confirms_delivery(self):
         history = {"enabled": True, "records": {"a": {"status": "accepted"}}}
         self.assertEqual(next_instagram_publication(history)["reason"], "pending")
+
+    def test_story_moves_to_friday_after_three_frames_accepted(self):
+        now = datetime(2026, 11, 11, 19, 26, tzinfo=MSK)
+        history = {
+            "enabled": True,
+            "campaign": {"enabled": True, "start_date": "2026-11-09", "end_date": "2026-12-08"},
+            "story_records": {str(i): {"campaign_date": "2026-11-11", "status": "accepted"} for i in range(3)}
+        }
+        slot = next_instagram_story(history, now=now)
+        self.assertEqual(slot["next_at"], "2026-11-13T19:15:00+03:00")
+
+    def test_story_awaits_remaining_frame(self):
+        now = datetime(2026, 11, 11, 19, 26, tzinfo=MSK)
+        history = {
+            "enabled": True,
+            "campaign": {"enabled": True, "start_date": "2026-11-09", "end_date": "2026-12-08"},
+            "story_records": {"1": {"campaign_date": "2026-11-11", "status": "accepted"}}
+        }
+        self.assertEqual(next_instagram_story(history, now=now)["next_at"],
+                         "2026-11-11T19:15:00+03:00")
 
     def test_instagram_check_is_not_publishing_promise(self):
         now=datetime(2026,11,9,17,55,tzinfo=MSK)

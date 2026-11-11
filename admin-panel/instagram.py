@@ -454,8 +454,7 @@ async def sync_instagram_story(read_file, update_file, identity):
     # Never count accepted-as-sent unless Buffer confirms "sent".
     changed = False
     old_accepted = [(key, v) for key, v in records.items()
-                    if v.get("status") == "accepted" and v.get("buffer_post_id")
-                    and v.get("campaign_date") != today]
+                    if v.get("status") == "accepted" and v.get("buffer_post_id")]
     for key, old in old_accepted[:8]:
         try:
             remote = await get_buffer_status(old["buffer_post_id"])
