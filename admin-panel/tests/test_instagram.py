@@ -43,6 +43,26 @@ class InstagramSafetyTests(unittest.TestCase):
         self.assertIn("#живописьмаслом", msg)
         self.assertLess(len(msg), 2200)
 
+    def test_verified_editorial_hooks_deterministic_and_bilingual(self):
+        post = {"title": "Горное озеро", "artist": "Инкатов Сергей",
+                "link": "https://ivory-art.com/shop/tproduct/1-123-gornoe-ozero",
+                "caption": "Холст, масло · 40 × 50 см"}
+        first = instagram.post_caption(post)
+        self.assertEqual(first, instagram.post_caption(post))
+        self.assertIn("#landscapepainting", first)
+        self.assertIn("#пейзаж", first)
+        self.assertLess(first.index("Artist:"), first.index("🇷🇺"))
+        self.assertIn("ivory-art.com", first)
+
+    def test_unknown_subject_has_no_fabricated_genre(self):
+        post = {"title": "Новая картина", "artist": "IVORY-ART",
+                "caption": "Оригинальная работа · 30 × 40 см"}
+        text = instagram.post_caption(post)
+        self.assertNotIn("#landscapepainting", text)
+        self.assertNotIn("#пейзаж", text)
+        self.assertNotIn("#натюрморт", text)
+        self.assertIn("#картины", text)
+
     def test_curated_translations_cover_every_catalog_item(self):
         import json
         from instagram_translations import TITLES, ARTISTS
