@@ -632,30 +632,3 @@ async def instagram_media(artwork_id: str):
         print("Instagram media preparation failed:", type(exc).__name__)
         raise HTTPException(502, "Artwork image unavailable") from exc
     return Response(image, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
-
-
-@app.on_event("startup")
-async def summarize_instagram_metrics():
-    """Read-only one-time analytics probe; metrics and date only, never credentials."""
-    try:
-        from instagram import graphql
-        data, _ = await read_file("paintings", "instagram_state.json")
-        for entry in (data.get("records") or {}).values():
-            post_id = entry.get("buffer_post_id")
-            if not post_id or entry.get("status") != "sent":
-                continue
-            result = await graphql(
-                "query($id: PostId!) { post(input: {id: $id}) { id status sentAt externalLink metricsUpdatedAt metrics { type value unit } } }",
-                {"id": post_id},
-            )
-            post = result["post"]
-            print("INSTAGRAM_METRICS_REPORT:" + json.dumps({
-                "title": entry.get("title"),
-                "status": post.get("status"),
-                "sent_at": post.get("sentAt"),
-                "updated_at": post.get("metricsUpdatedAt"),
-                "external_link": post.get("externalLink"),
-                "metrics": {m["type"]: m["value"] for m in (post.get("metrics") or [])},
-            }, ensure_ascii=False))
-    except Exception as exc:
-        print("INSTAGRAM_METRICS_ERROR:" + str(exc)[:260])
