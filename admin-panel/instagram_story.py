@@ -101,7 +101,9 @@ def story_triptych(photos, title, artist, dimensions=""):
             x0=min(main.width-crop_w, max(0,int(main.width*0.50)))
             y0=min(main.height-crop_h, max(0,int(main.height*0.20)))
             photo=main.crop((x0,y0,x0+crop_w,y0+crop_h))
-            photo.thumbnail((900,1190),Image.Resampling.LANCZOS)
+            scale=min(900/photo.width,1190/photo.height)
+            photo=photo.resize((max(1,round(photo.width*scale)),
+                                max(1,round(photo.height*scale))),Image.Resampling.LANCZOS)
             x=(1080-photo.width)//2
             y=304+(1190-photo.height)//2
             canvas.paste(photo,(x,y))
