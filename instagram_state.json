@@ -141,6 +141,16 @@
       "created_at": "2026-11-11T16:24:40.483928+00:00",
       "buffer_post_id": "6af496c9444c2727360e6d7d",
       "buffer_status": "sent"
+    },
+    "2026-11-11:877c981e3b8d2d4d44e2d1c1:slide-2": {
+      "artwork_id": "877c981e3b8d2d4d44e2d1c1",
+      "title": "Жаркое лето",
+      "campaign_date": "2026-11-11",
+      "slide": 2,
+      "total_slides": 3,
+      "format": "story",
+      "status": "uncertain",
+      "created_at": "2026-11-11T16:24:52.740173+00:00"
     }
   }
 }
