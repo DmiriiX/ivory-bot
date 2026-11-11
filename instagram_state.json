@@ -137,8 +137,10 @@
       "slide": 1,
       "total_slides": 3,
       "format": "story",
-      "status": "uncertain",
-      "created_at": "2026-11-11T16:24:40.483928+00:00"
+      "status": "accepted",
+      "created_at": "2026-11-11T16:24:40.483928+00:00",
+      "buffer_post_id": "6af496c9444c2727360e6d7d",
+      "buffer_status": "sent"
     }
   }
 }
