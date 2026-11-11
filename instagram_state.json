@@ -161,8 +161,10 @@
       "slide": 3,
       "total_slides": 3,
       "format": "story",
-      "status": "uncertain",
-      "created_at": "2026-11-11T16:25:04.767685+00:00"
+      "status": "accepted",
+      "created_at": "2026-11-11T16:25:04.767685+00:00",
+      "buffer_post_id": "6af496e2c39eba3c0404c8bd",
+      "buffer_status": "sent"
     }
   }
 }
