@@ -27,10 +27,15 @@
     },
     "877c981e3b8d2d4d44e2d1c1": {
       "title": "Жаркое лето",
-      "status": "uncertain",
+      "status": "sent",
       "created_at": "2026-11-09T15:39:07.537278+00:00",
       "campaign": true,
-      "campaign_date": "2026-11-09"
+      "campaign_date": "2026-11-09",
+      "format": "reel",
+      "external_link": "https://www.instagram.com/reel/DfhtTXBieOE/",
+      "buffer_status": "sent",
+      "verified_by": "Buffer API performance metrics 2026-11-11 (read-only query)",
+      "checked_at": "2026-11-11T06:02:19Z"
     }
   },
   "failed_attempts": [
