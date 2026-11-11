@@ -44,6 +44,7 @@ class StoryTriptychTests(unittest.TestCase):
             with patch.object(instagram,"due_now",return_value=True), \
                  patch.object(instagram,"instagram_channel",new=AsyncMock(return_value={"id":"ch"})), \
                  patch.object(instagram,"create_buffer_post",new=sender), \
+                 patch.object(instagram,"get_buffer_status",new=AsyncMock(return_value={"status":"sending"})), \
                  patch.object(instagram.httpx,"AsyncClient",return_value=FakeClient()):
                 first=await instagram.sync_instagram_story(
                     read_file,update_file,lambda kind,post:ARTWORK)
@@ -67,6 +68,7 @@ class StoryTriptychTests(unittest.TestCase):
             with patch.object(instagram,"due_now",return_value=True), \
                  patch.object(instagram,"instagram_channel",new=AsyncMock(return_value={"id":"ch"})), \
                  patch.object(instagram,"create_buffer_post",new=sender), \
+                 patch.object(instagram,"get_buffer_status",new=AsyncMock(return_value={"status":"sending"})), \
                  patch.object(instagram.httpx,"AsyncClient",return_value=FakeClient()):
                 first=await instagram.sync_instagram_story(
                     read_file,update_file,lambda kind,post:ARTWORK)
