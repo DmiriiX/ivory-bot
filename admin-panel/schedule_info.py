@@ -110,4 +110,15 @@ def next_instagram_story(history, now=None):
     if not history.get("enabled", False):
         return {"next_at": None, "reason": "paused"}
     campaign = history.get("campaign") or {}
-    return campaign_slot(campaign, "story", now)
+    current = (now or datetime.now(MSK)).astimezone(MSK)
+    # Once all three frames were accepted for today, the current slot is
+    # finished. Never keep showing "awaiting launch" after successful handoff.
+    today = current.date().isoformat()
+    today_records = [v for v in (history.get("story_records") or {}).values()
+                     if v.get("campaign_date") == today]
+    if (len(today_records) >= 3 and
+        all(v.get("status") in ("accepted", "sent") for v in today_records)):
+        from datetime import timedelta
+        current = datetime.combine(current.date() + timedelta(days=1),
+                                   time(0, 0), tzinfo=MSK)
+    return campaign_slot(campaign, "story", current)
