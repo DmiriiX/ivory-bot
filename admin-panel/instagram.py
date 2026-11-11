@@ -154,27 +154,60 @@ def post_caption(post):
 
     title_en = TITLES.get(title_ru, "Original Artwork")
     artist_en = ARTISTS.get(artist_ru, "IVORY-ART Gallery")
+
+    # Curated, verifiable editorial hooks: no fabricated life story or provenance.
+    # Deterministic per artwork, so updates do not randomly alter future copy.
+    hooks = (
+        ("Explore an original artwork and its fine details.",
+         "Рассмотрите оригинальную работу и её детали."),
+        ("A closer look at the composition and technique.",
+         "Присмотритесь к композиции и технике исполнения."),
+        ("Discover the work through its colours and textures.",
+         "Откройте для себя работу через её цвета и фактуру."),
+        ("An original work of art, presented by IVORY-ART Gallery.",
+         "Оригинальное произведение искусства из коллекции IVORY-ART."),
+    )
+    source_id = str(post.get("link") or title_ru)
+    hook_index = int(hashlib.sha256(source_id.encode("utf-8")).hexdigest(), 16) % len(hooks)
+    intro_en, intro_ru = hooks[hook_index]
+
+    # Genre tags are added only for explicitly listed titles whose subjects
+    # are evident; unknown titles retain neutral medium-based tags.
+    landscape_titles = {
+        "Крым. Бабье лето - 30х50 см", "Альпы", "Горное озеро",
+        "Река", "Закат над городом", "Закат", "Гриновский Крым. Балаклава",
+    }
+    still_life_titles = {"Летний натюрморт", "Маки", "Зеленый чай"}
+    genre_tags = (
+        ("#landscapepainting", "#пейзаж") if title_ru in landscape_titles else
+        ("#stilllifepainting", "#натюрморт") if title_ru in still_life_titles else
+        ("", "")
+    )
+
     english = [
         f'🎨 "{title_en}"',
         f'Artist: {artist_en}' if artist_ru and artist_ru != "IVORY-ART" else "IVORY-ART Gallery",
         " · ".join(x for x in [medium_en, dims_en] if x),
+        intro_en,
         "",
-        "Discover the collection at ivory-art.com",
+        "Explore original artworks at ivory-art.com",
     ]
     russian = [
         f'🇷🇺 «{title_ru}»' if title_ru else "🇷🇺 Оригинальная картина",
         artist_ru,
         " · ".join(x for x in [medium_ru, dims_ru] if x),
+        intro_ru,
         "",
-        "Посмотрите коллекцию на ivory-art.com",
+        "Откройте коллекцию оригинальных произведений на ivory-art.com",
     ]
     tags = " ".join([
         "#ivoryart", "#artgallery", "#contemporaryart", "#originalart",
         tags_en, "#russianart",
         "#картины", "#искусство", "#художники", tags_ru, "#галереякартин",
+        *genre_tags,
     ])
     return ("\n".join(english) + "\n\n" + "\n".join(russian)
-            + "\n\n" + tags).strip()[:2100]
+            + "\n\n" + " ".join(tags.split())).strip()[:2100]
 
 async def ensure_public_image(post, item_id, github_api):
     """Commit an image to public GitHub storage before Buffer reads it."""
