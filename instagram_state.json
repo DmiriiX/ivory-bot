@@ -149,8 +149,10 @@
       "slide": 2,
       "total_slides": 3,
       "format": "story",
-      "status": "uncertain",
-      "created_at": "2026-11-11T16:24:52.740173+00:00"
+      "status": "accepted",
+      "created_at": "2026-11-11T16:24:52.740173+00:00",
+      "buffer_post_id": "6af496d662aea97cb938c9bb",
+      "buffer_status": "sent"
     }
   }
 }
