@@ -23,7 +23,7 @@ p{color:var(--muted);margin:7px 0 16px}
 small{color:var(--muted)}
 .tabs,.tools{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
 .tabs{flex-wrap:nowrap;margin:25px 0 18px;padding:5px;background:#171612;border:1px solid var(--line);border-radius:5px}
-.tabs button{flex:1;min-width:0;padding:12px 8px;border:1px solid transparent;border-radius:2px;background:transparent;color:#c4bfb4;font-weight:500}
+.tabs button{flex:1;min-width:0;padding:12px 5px;border:1px solid transparent;border-radius:2px;background:transparent;color:#c4bfb4;font-weight:500}
 .tabs button.active{background:var(--gold);color:var(--accent-ink);border-color:var(--gold)}
 button{cursor:pointer;border:1px solid #68604e;border-radius:3px;padding:11px 15px;background:#26231d;color:var(--gold);font:inherit;transition:background .2s,color .2s,border-color .2s,transform .2s}
 button:hover:not(:disabled){background:#383126;border-color:var(--gold)}
@@ -84,7 +84,7 @@ dialog::backdrop{background:#000b}
  .metric strong{font-size:25px}
  .post img{width:74px;height:88px}
  .tabs{gap:3px;padding:4px}
- .tabs button{padding:11px 5px;font-size:13px}
+ .tabs button{padding:10px 3px;font-size:11px}
  .between{align-items:flex-start}
  .between .status{flex-shrink:0}
 }
@@ -93,7 +93,7 @@ dialog::backdrop{background:#000b}
 <main>
 <header><div class="brand">IVORY ART<small>GALLERY · ADMIN</small></div><div id="username">Telegram</div></header>
 <h1>Управление публикациями</h1><p>Картины и факты об искусстве · Telegram, MAX и Instagram</p>
-<nav class="tabs" aria-label="Разделы управления"><button class="active" data-kind="paintings" aria-selected="true">Картины</button><button data-kind="facts" aria-selected="false">Факты</button><button data-kind="instagram" aria-selected="false">Instagram</button></nav>
+<nav class="tabs" aria-label="Разделы управления"><button class="active" data-kind="paintings" aria-selected="true">Картины</button><button data-kind="facts" aria-selected="false">Факты</button><button data-kind="instagram" aria-selected="false">Instagram</button><button data-kind="igfacts" aria-selected="false">Instagram · Факты</button></nav>
 <div id="error" role="alert"></div>
 <section id="instagram-section" hidden><div class="panel"><div class="between"><div><h2>Instagram · @ivoryartgallery</h2><small>Автоматическая публикация через Buffer</small></div><span id="instagram-status" class="status">Проверка</span></div><p id="instagram-details">Статус подключения загружается…</p><div class="next-time"><small>30 дней без рекламы · 9 ноября - 8 декабря</small><strong>4 поста в неделю: 2 Reels + 2 карусели</strong><small>Первый Reel сегодня, 9 ноября · 18:15 МСК. На первой неделе публикации 9, 12, 14 и 15 ноября, затем по вторникам, четвергам, субботам и воскресеньям.</small></div>
 <div class="next-time"><small>Следующая публикация Instagram · Москва</small><strong id="instagram-next">Загрузка…</strong><small>Фактическая доставка зависит от Buffer. Публикация не повторяется автоматически при неизвестном результате.</small></div>
@@ -107,6 +107,24 @@ dialog::backdrop{background:#000b}
 <div class="tools"><select id="ig-reel-style" aria-label="Стиль Reel"><option value="cinematic">Cinematic - атмосферный</option><option value="luxury">Luxury Editorial - галерейный</option></select><button id="ig-reel" type="button" disabled>Создать предпросмотр Reel</button></div>
 <video id="ig-video" controls playsinline style="width:min(100%,340px);max-height:520px;display:none;border-radius:10px;background:#eee" aria-label="Предпросмотр Reel"></video>
 <small>Предпросмотр ничего не публикует. Автопубликация использует отдельные MP4 и JPEG, подготовленные заранее. Для Reels звучит оригинальная инструментальная музыка Ivory Art. В календаре стили Cinematic и Luxury чередуются; Stories состоят из трёх слайдов.</small></div></section>
+<section id="igfacts-section" hidden>
+<div class="panel">
+ <div class="between"><div><h2>Instagram · Факты об искусстве</h2><small>Независимая очередь: с факта №1, без учёта Telegram и MAX</small></div><span class="status" id="igfacts-status">Загрузка</span></div>
+ <p>Цикл: <b>Факт → Картина → Картина</b>, затем следующий факт. Четыре публикации в ленте в неделю: общие слоты Instagram. Открывайте тексты и медиа перед публикацией, редактируйте только Instagram-версию.</p>
+ <div class="next-time"><small>Следующий выпуск в ленте · МСК</small><strong id="igfacts-next">Загрузка…</strong><small id="igfacts-kind">Формат и произведение определяются по очереди и готовности медиа. План может измениться после отправки Buffer.</small></div>
+ <button id="igfacts-toggle" disabled>Проверка…</button><button id="igfacts-refresh" type="button">Обновить</button>
+ <small style="display:block;margin-top:10px">Включение фактов заменяет каждый третий слот картины; Telegram и MAX не затрагиваются. Публикация зависит от подтверждения Buffer.</small>
+</div>
+<div class="panel"><h2>Календарь Instagram</h2><p>Общий график фактов, Reels и каруселей. Время указано по Москве.</p><div id="igfacts-calendar" class="ig-calendar"><div class="placeholder">Загрузка календаря…</div></div></div>
+<div class="between"><h2>Факты - предпросмотр и тексты</h2><small id="igfacts-total"></small></div>
+<div class="filters"><button class="active" data-igfacts-filter="queue">Ожидают</button><button data-igfacts-filter="sent">Отправлены</button><button data-igfacts-filter="all">Все</button></div>
+<div id="igfacts-list"><div class="placeholder">Загрузка фактов…</div></div>
+<div class="panel"><h2>Картины и Reels - редактор Instagram</h2><p>Выберите работу, чтобы заранее посмотреть подпись на двух языках и изменить её без правок Telegram/MAX.</p>
+<select id="igfacts-artwork" style="width:100%;max-width:580px" aria-label="Произведение для Instagram"><option value="">Загрузка картин…</option></select>
+<div class="tools"><button id="igfacts-artwork-preview">Показать подпись</button><button id="igfacts-artwork-reel">Предпросмотр Reel</button></div>
+<div id="igfacts-artwork-draft" class="panel" hidden></div>
+</div>
+</section>
 <section id="publisher-section">
 <div class="metrics"><div class="metric"><strong id="total">-</strong><span>Всего</span></div><div class="metric"><strong id="published">-</strong><span>Использовано</span></div><div class="metric"><strong id="remaining">-</strong><span>В очереди</span></div></div>
 <section class="panel"><div class="between"><div><h2 id="heading">Картины</h2><small id="last">Последняя публикация: -</small></div><span id="status" class="status">Загрузка</span></div><div id="pending" style="display:none;color:#a43f35;margin-top:10px"></div><div class="next-time"><small>Следующая публикация · по Москве</small><strong id="next-post">Загрузка…</strong><small id="next-note">Расчётное время запуска, фактическая отправка может задержаться.</small></div>
@@ -116,15 +134,17 @@ dialog::backdrop{background:#000b}
 <div class="filters"><button class="active" data-filter="queue">Ожидают</button><button data-filter="used">Использованы</button><button data-filter="excluded">Исключены</button><button data-filter="all">Все</button></div>
 <div id="list"><div class="placeholder">Загрузка записей…</div></div>
 </section>
+<dialog id="igfacts-editor"><h2>Текст для Instagram</h2><p id="igfacts-edit-title"></p><textarea id="igfacts-edit-text" rows="13" style="min-height:300px"></textarea><small>Английский блок первым, русский вторым. Хештеги внутри текста. Изменения действуют только на будущие публикации Instagram.</small><div class="tools"><button id="igfacts-save" class="primary">Сохранить</button><button id="igfacts-cancel">Отмена</button></div></dialog>
 <dialog id="editor"><h2>Редактировать текст</h2><p id="edit-title"></p><textarea id="edit-text"></textarea><div class="tools"><button id="save" class="primary">Сохранить</button><button id="cancel">Отмена</button></div></dialog>
 </main>
 <script>
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const init=tg?.initData||"";const $=id=>document.getElementById(id);
-const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null};
+const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null,igFacts:null,igFactFilter:"queue",igFactEdit:null};
 function showSection(kind){
  $("instagram-section").hidden=kind!=="instagram";
- $("publisher-section").hidden=kind==="instagram";
+ $("igfacts-section").hidden=kind!=="igfacts";
+ $("publisher-section").hidden=kind==="instagram"||kind==="igfacts";
  for(const b of document.querySelectorAll("[data-kind]")){
   const active=b.dataset.kind===kind;
   b.classList.toggle("active",active);
@@ -187,7 +207,7 @@ rich.onclick=async()=>{const enabled=!x.rich_media_enabled;
  try{await api("/api/integrations/instagram/rich-media",{enabled});await checkInstagram()}catch(e){err(e.message)}
 };
 const btn=$("instagram-toggle");btn.disabled=!x.connected;btn.textContent=x.enabled?"Приостановить Instagram":"Включить Instagram";btn.onclick=async()=>{if(!confirm(x.enabled?"Приостановить автопубликации в Instagram?":"Включить автоматическую публикацию новых картин в Instagram?"))return;try{await api("/api/integrations/instagram/toggle",{enabled:!x.enabled});await checkInstagram()}catch(e){err(e.message)}}}catch(e){text($("instagram-status"),"Недоступен");text($("instagram-details"),"Не удалось проверить Instagram: "+e.message)}}
-async function load(){if(state.kind==="instagram")return;err("");try{state.data=await api("/api/"+state.kind);render()}catch(e){err("Не удалось загрузить данные: "+e.message);$("list").replaceChildren()}}
+async function load(){if(state.kind==="instagram"||state.kind==="igfacts")return;err("");try{state.data=await api("/api/"+state.kind);render()}catch(e){err("Не удалось загрузить данные: "+e.message);$("list").replaceChildren()}}
 function button(label,handler){const b=document.createElement("button");b.textContent=label;b.onclick=handler;return b}
 async function action(path,body,confirmText){if(confirmText&&!confirm(confirmText))return;err("");try{await api("/api/"+state.kind+"/"+path,body);await load()}catch(e){err(e.message)}}
 function render(){const d=state.data;if(!d)return;updateSchedules();text($("next-note"),d.next_schedule?.reason==="scheduled"?"Плановое время GitHub Actions. Реальная публикация может задержаться.":"Расписание возобновится после устранения причины.");["total","published","remaining"].forEach(x=>text($(x),String(d[x])));text($("heading"),state.kind==="paintings"?"Картины":"Факты");text($("last"),"Последняя запись: "+date(d.last_post_at));text($("status"),d.paused?"На паузе":"Активен");$("status").className="status"+(d.paused?" paused":"");$("toggle").textContent=d.paused?"Возобновить":"Приостановить";$("publish").disabled=d.paused||!!d.pending||d.remaining===0;
@@ -249,9 +269,94 @@ $("ig-reel").onclick=async()=>{
  }catch(e){text($("ig-media-info"),"Reel не удалось собрать: "+e.message)}
  finally{btn.disabled=false;btn.textContent="Собрать Reel для просмотра"}
 };
+
+async function loadEditorial(){
+ try{
+  const data=await api("/api/integrations/instagram/editorial");
+  state.igFacts=data;renderEditorial();err("");
+ }catch(e){err("Instagram · Факты: "+e.message)}
+}
+function editorialEdit(kind,p){
+ state.igFactEdit={kind,id:p.id,title:p.title};
+ text($("igfacts-edit-title"),p.title||"Instagram");
+ $("igfacts-edit-text").value=p.caption||"";
+ $("igfacts-editor").showModal();
+}
+function renderEditorial(){
+ const d=state.igFacts;if(!d)return;
+ text($("igfacts-status"),d.facts_enabled?"Активно":"Не включено");
+ $("igfacts-status").className="status"+(d.facts_enabled?"":" paused");
+ const slot=(d.calendar||[])[0];
+ text($("igfacts-next"),slot?date(slot.at)+" МСК · "+(slot.kind==="fact"?"Факт":"Картина"): "Нет доступных слотов");
+ text($("igfacts-kind"),slot?slot.title+" · "+slot.format:"Расписание закончилось");
+ const t=$("igfacts-toggle");t.disabled=false;t.textContent=d.facts_enabled?"Приостановить факты Instagram":"Включить рубрику «Факты»";
+ t.onclick=async()=>{if(!confirm(d.facts_enabled?"Приостановить факты, оставить картины?":"Включить независимую рубрику фактов в Instagram, заменив каждый третий слот картины?"))return;
+  try{await api("/api/integrations/instagram/editorial/toggle",{enabled:!d.facts_enabled});await loadEditorial();await checkInstagram()}catch(e){err(e.message)}};
+ const calendar=$("igfacts-calendar");calendar.replaceChildren();
+ for(const item of d.calendar||[]){
+  const r=document.createElement("div");r.className="between";r.style.cssText="border-top:1px solid var(--line);padding:12px 0;gap:12px";
+  const label=document.createElement("div");
+  const title=document.createElement("b");title.textContent=(item.kind==="fact"?"Факт":item.format==="reel"?"Reel":"Карусель")+" · "+item.title;
+  const when=document.createElement("small");when.style.display="block";when.textContent=date(item.at)+" МСК · план";
+  label.append(title,when);r.append(label);
+  if(item.kind==="fact"&&item.id){const btn=button("Открыть текст",()=>{const p=d.facts.find(x=>x.id===item.id);if(p)editorialEdit("fact",p)});r.append(btn)}
+  calendar.append(r);
+ }
+ text($("igfacts-total"),d.facts.length+" тем, с №1");
+ const list=$("igfacts-list");list.replaceChildren();
+ for(const p of d.facts){
+  if(state.igFactFilter==="queue" && (p.status!=="queue"||p.excluded))continue;
+  if(state.igFactFilter==="sent" && !["sent","accepted","failed","uncertain"].includes(p.status))continue;
+  const card=document.createElement("article");card.className="post";
+  if(p.photo){const img=document.createElement("img");img.src=p.photo;img.alt=p.title;img.loading="lazy";img.referrerPolicy="no-referrer";card.append(img)}
+  const body=document.createElement("div");body.className="body";
+  const heading=document.createElement("b");heading.textContent="Факт №"+p.id+" · "+p.title;body.append(heading);
+  const note=document.createElement("small");note.textContent=p.excluded?"Исключён":p.status==="queue"?"Ожидает":p.status;body.append(note);
+  const preview=document.createElement("div");preview.className="summary";preview.textContent=p.caption;body.append(preview);
+  const actions=document.createElement("div");actions.className="actions";
+  actions.append(button("Полный текст / изменить",()=>editorialEdit("fact",p)));
+  if(p.status==="queue"){
+   actions.append(button(p.excluded?"Вернуть":"Исключить",async()=>{try{await api("/api/integrations/instagram/editorial/exclude",{id:Number(p.id),excluded:!p.excluded});await loadEditorial()}catch(e){err(e.message)}}));
+   if(!p.excluded)actions.append(button("Следующий",async()=>{try{await api("/api/integrations/instagram/editorial/next",{id:Number(p.id)});await loadEditorial()}catch(e){err(e.message)}}));
+  }
+  if(p.photo){const link=document.createElement("a");link.href=p.photo;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Посмотреть обложку";actions.append(link)}
+  body.append(actions);card.append(body);list.append(card);
+ }
+ if(!list.children.length){const empty=document.createElement("div");empty.className="placeholder";empty.textContent="Нет публикаций в выбранной категории";list.append(empty)}
+ const picker=$("igfacts-artwork");const selected=picker.value;picker.replaceChildren();
+ for(const p of d.artworks){const option=document.createElement("option");option.value=p.id;option.textContent=p.title+" · "+p.artist+(p.status!=="queue"?" · "+p.status:"");picker.append(option)}
+ if(d.artworks.some(x=>x.id===selected))picker.value=selected;
+}
+$("igfacts-refresh").onclick=loadEditorial;
+$("igfacts-cancel").onclick=()=>$("igfacts-editor").close();
+$("igfacts-save").onclick=async()=>{
+ const p=state.igFactEdit;if(!p)return;
+ const caption=$("igfacts-edit-text").value.trim();
+ if(!caption){err("Текст пуст");return}
+ try{await api("/api/integrations/instagram/editorial/caption",{kind:p.kind,id:p.id,caption});$("igfacts-editor").close();await loadEditorial()}catch(e){err(e.message)}
+};
+$("igfacts-artwork-preview").onclick=()=>{
+ const p=state.igFacts?.artworks.find(x=>x.id===$("igfacts-artwork").value);
+ if(!p)return;const box=$("igfacts-artwork-draft");box.hidden=false;box.replaceChildren();
+ const name=document.createElement("h2");name.textContent=p.title;box.append(name);
+ const img=document.createElement("img");img.src=p.photo;img.alt=p.title;img.style.cssText="max-width:220px;width:100%;object-fit:contain;display:block;margin:10px 0";box.append(img);
+ const caption=document.createElement("pre");caption.style.cssText="white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);font:inherit";caption.textContent=p.caption;box.append(caption);
+ box.append(button("Изменить подпись",()=>editorialEdit("artwork",p)));
+};
+$("igfacts-artwork-reel").onclick=()=>{
+ const p=state.igFacts?.artworks.find(x=>x.id===$("igfacts-artwork").value);if(!p)return;
+ state.kind="instagram";showSection("instagram");$("ig-artwork").value=p.id;
+ $("ig-preview").click();err("Проверьте фотографии, затем нажмите «Создать предпросмотр Reel». Публикации не будет.");
+};
+for(const b of document.querySelectorAll("[data-igfacts-filter]"))b.onclick=()=>{
+ state.igFactFilter=b.dataset.igfactsFilter;
+ document.querySelectorAll("[data-igfacts-filter]").forEach(x=>x.classList.toggle("active",x===b));
+ renderEditorial()
+};
 for(const b of document.querySelectorAll("[data-kind]"))b.onclick=()=>{
  state.kind=b.dataset.kind;showSection(state.kind);err("");
  if(state.kind==="instagram"){checkInstagram();return}
+ if(state.kind==="igfacts"){loadEditorial();return}
  load()
 };
 for(const b of document.querySelectorAll("[data-filter]"))b.onclick=()=>{state.filter=b.dataset.filter;document.querySelectorAll("[data-filter]").forEach(x=>x.classList.toggle("active",x===b));render()};
@@ -259,5 +364,5 @@ $("toggle").onclick=()=>action("pause",{paused:!state.data.paused});
 $("publish").onclick=()=>action("publish",{},"Запустить реальную публикацию в Telegram и MAX? Эта операция может создать новый пост.");
 $("refresh").onclick=load;$("instagram-refresh").onclick=checkInstagram;$("cancel").onclick=()=>$("editor").close();
 $("save").onclick=async()=>{const p=state.edit;if(!p)return;$("editor").close();await action("caption",{id:p.id,caption:$("edit-text").value})};
-showSection(state.kind);load();checkInstagram();loadInstagramArtworks();setInterval(updateSchedules,60000);
+showSection(state.kind);load();checkInstagram();loadInstagramArtworks();loadEditorial();setInterval(updateSchedules,60000);
 </script></body></html>
