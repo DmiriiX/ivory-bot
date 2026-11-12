@@ -138,7 +138,7 @@ def fact_key(fact):
     return "igfact:"+str(fact["id"])
 
 def fact_caption(fact):
-    entry=FACTS.get(int(fact["id"]))
+    entry=FACTS.get(str(fact["id"]))
     if not entry:
         raise ValueError("Unreviewed Instagram fact ID")
     return "\n\n".join((
@@ -166,7 +166,7 @@ def next_fact(facts,state):
     excluded=set(str(x) for x in state.get("ig_fact_excluded",[]))
     next_id=state.get("ig_fact_next_id")
     eligible=[p for p in facts if str(p.get("id")) not in excluded
-              and fact_key(p) not in records and int(p.get("id",-1)) in FACTS]
+              and fact_key(p) not in records and str(p.get("id",-1)) in FACTS]
     eligible.sort(key=lambda p:int(p["id"]))
     return next((p for p in eligible if str(p["id"])==str(next_id)),None) or (eligible[0] if eligible else None)
 
