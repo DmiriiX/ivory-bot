@@ -138,13 +138,16 @@ MSK=ZoneInfo("Europe/Moscow")
 def fact_key(fact):
     return "igfact:"+str(fact["id"])
 
-def fact_caption(fact):
+def fact_caption(fact, override=None):
     entry=FACTS.get(str(fact["id"]))
     if not entry:
         raise ValueError("Unreviewed Instagram fact ID")
+    override = override or {}
+    en = override.get("en") or entry["en"]
+    ru = override.get("ru") or entry["ru"]
     return "\n\n".join((
-        "ART FACTS · "+entry["en_title"]+"\n"+entry["en"],
-        "ФАКТЫ ОБ ИСКУССТВЕ · "+entry["ru_title"]+"\n"+entry["ru"],
+        "ART FACTS · "+entry["en_title"]+"\n"+en,
+        "ФАКТЫ ОБ ИСКУССТВЕ · "+entry["ru_title"]+"\n"+ru,
         "#ivoryart #artfacts #arthistory #arteducation "+entry["en_tags"]+
         "\n#фактыобискусстве #историяискусства #живопись "+entry["ru_tags"]
     ))
@@ -152,12 +155,16 @@ def fact_caption(fact):
 def fact_media(fact):
     return IMAGE_PREFIX+"fact-"+str(fact["id"]).zfill(2)+".jpg"
 
-def fact_slides(fact):
-    """Four 4:5 editorial slides, in reading order: cover, EN, RU, CTA."""
+def fact_slides(fact, override=None):
+    """Four 4:5 slides; a revision is immutable until all JPGs are ready."""
     key=str(fact["id"])
     if key not in FACTS:
         raise ValueError("Unreviewed fact")
-    return [IMAGE_PREFIX+"fact-"+key.zfill(2)+"-"+str(n)+".jpg"
+    revision=(override or {}).get("revision", "")
+    if revision and not re.fullmatch(r"[0-9a-f]{12}",revision):
+        raise ValueError("Invalid slide revision")
+    suffix="-"+revision if revision else ""
+    return [IMAGE_PREFIX+"fact-"+key.zfill(2)+"-"+str(n)+suffix+".jpg"
             for n in range(1,5)]
 
 
