@@ -285,7 +285,10 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
         prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/facts/"
         links = (media or {}).get("images") or []
         identifier = str(post.get("fact_id") or "")
-        if not identifier.isdigit() or len(links) != 4 or links != fact_slides({"id": identifier}):
+        expected = post.get("fact_slide_urls") or []
+        if (not identifier.isdigit() or len(links) != 4 or links != expected
+                or not all(re.fullmatch(re.escape(prefix)+r"fact-"+identifier.zfill(2)
+                    +r"-[1-4](?:-[0-9a-f]{12})?\\.jpg", u) for u in links)):
             raise ValueError("Instagram Fact must have 4 verified editorial slides")
         assets = [{"image": {"url": link}} for link in links]
         kind = "carousel"
@@ -392,7 +395,13 @@ async def sync_instagram(read_file, update_file, identity, github_api):
             return {"ok": True, "reason": "Instagram facts queue exhausted; review before publishing artwork"}
         item_id = fact_key(fact)
         image_url = fact_media(fact)
-        slides = fact_slides(fact)
+        try:
+            edits, _ = await read_file("paintings", "instagram_fact_slide_overrides.json")
+        except Exception:
+            # Never use potentially stale images if the edited media source is unavailable.
+            return {"ok": False, "reason": "Fact slide editing state unavailable"}
+        slide_edit = edits.get(str(fact["id"])) or {}
+        slides = fact_slides(fact, slide_edit)
         # Validate ALL four images before making a no-repeat reservation.
         async with httpx.AsyncClient(timeout=18, follow_redirects=True) as client:
             for index, slide_url in enumerate(slides, 1):
@@ -403,8 +412,8 @@ async def sync_instagram(read_file, update_file, identity, github_api):
                 except httpx.HTTPError:
                     return {"ok": False, "reason": "Fact carousel slide "+str(index)+" unreachable", "id": item_id}
         override = (state.get("ig_fact_captions") or {}).get(str(fact["id"]))
-        text = override if isinstance(override,str) and override.strip() else fact_caption(fact)
-        prepared_post = {"photo":image_url, "title":fact.get("title"), "fact_id":fact["id"], "instagram_caption":text}
+        text = override if isinstance(override,str) and override.strip() else fact_caption(fact, slide_edit)
+        prepared_post = {"photo":image_url, "title":fact.get("title"), "fact_id":fact["id"], "fact_slide_urls":slides, "instagram_caption":text}
         records[item_id] = {
             "title":fact.get("title"),"status":"uncertain","format":"carousel",
             "editorial_cycle":True,"kind":"fact","fact_id":fact["id"],
