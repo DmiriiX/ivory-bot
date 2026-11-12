@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from schedule_info import next_instagram_publication
 from instagram_campaign import due_now, feed_format
-from instagram_facts import next_fact, cycle_next_kind, fact_key, fact_caption, fact_media
+from instagram_facts import next_fact, cycle_next_kind, fact_key, fact_caption, fact_media, fact_slides
 import base64
 from media import normalized_image
 from instagram_translations import TITLES, ARTISTS
@@ -281,7 +281,15 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
       }
     }
     """
-    if kind == "story":
+    if kind == "fact_carousel":
+        prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/facts/"
+        links = (media or {}).get("images") or []
+        identifier = str(post.get("fact_id") or "")
+        if not identifier.isdigit() or len(links) != 4 or links != fact_slides({"id": identifier}):
+            raise ValueError("Instagram Fact must have 4 verified editorial slides")
+        assets = [{"image": {"url": link}} for link in links]
+        kind = "carousel"
+    elif kind == "story":
         prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/"
         story_url = (media or {}).get("story") or ""
         if (not story_url.startswith(prefix)
@@ -384,19 +392,21 @@ async def sync_instagram(read_file, update_file, identity, github_api):
             return {"ok": True, "reason": "Instagram facts queue exhausted; review before publishing artwork"}
         item_id = fact_key(fact)
         image_url = fact_media(fact)
-        # Validate public media before writing a no-repeat reservation.
-        async with httpx.AsyncClient(timeout=16, follow_redirects=True) as client:
-            try:
-                response = await client.head(image_url)
-                if response.status_code != 200 or not response.headers.get("content-type","").startswith("image/"):
-                    return {"ok": False, "reason": "Fact image not ready", "id": item_id}
-            except httpx.HTTPError:
-                return {"ok": False, "reason": "Fact image unreachable", "id": item_id}
+        slides = fact_slides(fact)
+        # Validate ALL four images before making a no-repeat reservation.
+        async with httpx.AsyncClient(timeout=18, follow_redirects=True) as client:
+            for index, slide_url in enumerate(slides, 1):
+                try:
+                    response = await client.head(slide_url)
+                    if response.status_code != 200 or not response.headers.get("content-type","").startswith("image/"):
+                        return {"ok": False, "reason": "Fact carousel slide "+str(index)+" not ready", "id": item_id}
+                except httpx.HTTPError:
+                    return {"ok": False, "reason": "Fact carousel slide "+str(index)+" unreachable", "id": item_id}
         override = (state.get("ig_fact_captions") or {}).get(str(fact["id"]))
         text = override if isinstance(override,str) and override.strip() else fact_caption(fact)
-        prepared_post = {"photo":image_url, "title":fact.get("title"), "instagram_caption":text}
+        prepared_post = {"photo":image_url, "title":fact.get("title"), "fact_id":fact["id"], "instagram_caption":text}
         records[item_id] = {
-            "title":fact.get("title"),"status":"uncertain","format":"post",
+            "title":fact.get("title"),"status":"uncertain","format":"carousel",
             "editorial_cycle":True,"kind":"fact","fact_id":fact["id"],
             "created_at":datetime.now(timezone.utc).isoformat(),
             "campaign":True,"campaign_date":now_msk.date().isoformat(),
@@ -405,7 +415,8 @@ async def sync_instagram(read_file, update_file, identity, github_api):
                                     "Reserve Instagram Fact independently from TG/MAX")
         new_sha=(updated.get("content") or {}).get("sha") or (await read_file("paintings","instagram_state.json"))[1]
         try:
-            remote=await create_buffer_post((await instagram_channel())["id"],prepared_post,image_url)
+            remote=await create_buffer_post((await instagram_channel())["id"],prepared_post,image_url,
+                                            media={"images":slides},kind="fact_carousel")
         except ValueError as exc:
             records[item_id]["status"]="failed"
             records[item_id]["error"]=str(exc)[:230]
