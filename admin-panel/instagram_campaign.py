@@ -65,7 +65,7 @@ def feed_format(records, available):
     """Alternate 2 Reels and 2 carousels per week when prepared media allows."""
     published = sum(1 for v in records.values()
                     if v.get("status") in ("sent", "accepted")
-                    and v.get("campaign") is True)
+                    and v.get("campaign") is True and v.get("kind") != "fact")
     desired = ("reel", "carousel", "reel", "carousel")[published % 4]
     if desired in available:
         return desired
