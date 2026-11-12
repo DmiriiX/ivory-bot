@@ -6,7 +6,7 @@ third-party music are requested, so automatic publishing can be attempted.
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 
 def _font(size, serif=True):
@@ -61,7 +61,7 @@ def story_image(photo_bytes, title, artist):
 def story_triptych(photos, title, artist, dimensions=""):
     """Three distinct 9:16 branded images, preserving real painting pixels.
 
-    Slide 1: entire artwork. Slide 2: real detail crops.
+    Slide 1: entire artwork. Slide 2: one large authentic photo detail.
     Slide 3: entire artwork with a clear site CTA (non-clickable in image).
     """
     if not photos:
@@ -91,22 +91,28 @@ def story_triptych(photos, title, artist, dimensions=""):
             d.text((74,1624),title,font=_fit_text(title,52,923),fill="#f6f0e3")
             d.text((74,1720),artist,font=_fit_text(artist,31,920,False),fill="#cfc3ad")
         elif slide==2:
-            # Crops show authentic photo detail; never synthesize new painting.
-            for pos,(img,focus) in enumerate(((main,.2),(detail,.78))):
-                w,h=920,564
-                scale=max(w/img.width,h/img.height)*1.08
-                iw,ih=int(img.width*scale),int(img.height*scale)
-                frame=img.resize((iw,ih),Image.Resampling.LANCZOS)
-                ox=min(max(0,int((iw-w)*focus)),iw-w)
-                oy=(ih-h)//2
-                frame=frame.crop((ox,oy,ox+w,oy+h))
-                canvas.paste(frame,(80,302+pos*590))
+            # A single authentic detail keeps the composition clear on a phone.
+            # Prepared images may contain a pale preservation mat; exclude it
+            # from the close crop so it does not become a large empty stripe.
+            corner=detail.getpixel((0,0))
+            if all(channel >= 225 for channel in corner):
+                diff=ImageChops.difference(detail,Image.new("RGB",detail.size,corner))
+                bounds=diff.convert("L").point(lambda value: 255 if value>30 else 0).getbbox()
+                if bounds and (bounds[2]-bounds[0])*(bounds[3]-bounds[1]) > detail.width*detail.height*.12:
+                    detail=detail.crop(bounds)
+            w,h=920,1130
+            scale=max(w/detail.width,h/detail.height)*1.06
+            iw,ih=int(detail.width*scale),int(detail.height*scale)
+            frame=detail.resize((iw,ih),Image.Resampling.LANCZOS)
+            ox=(iw-w)//2
+            oy=(ih-h)//2
+            canvas.paste(frame.crop((ox,oy,ox+w,oy+h)),(80,302))
             d=ImageDraw.Draw(canvas)
-            d.text((76,1550),"THE ART IS IN",font=_font(43),fill="#f2e3bc")
-            d.text((76,1620),"THE DETAILS",font=_font(53),fill="#f2e3bc")
+            d.text((76,1510),"THE ART IS IN",font=_font(43),fill="#f2e3bc")
+            d.text((76,1580),"THE DETAILS",font=_font(53),fill="#f2e3bc")
             dimension=str(dimensions or "")[:84]
             if dimension:
-                d.text((77,1710),dimension,font=_fit_text(dimension,27,920,False),fill="#d3cab8")
+                d.text((77,1685),dimension,font=_fit_text(dimension,27,920,False),fill="#d3cab8")
         else:
             photo=main.copy()
             photo.thumbnail((850,1070),Image.Resampling.LANCZOS)

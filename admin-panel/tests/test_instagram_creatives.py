@@ -34,6 +34,16 @@ class CreativeSafetyTests(unittest.TestCase):
                 self.assertEqual(img.size, (1080, 1920))
                 self.assertEqual(img.format, "JPEG")
 
+    def test_detail_slide_has_one_photo_not_two_stacked_photos(self):
+        first, second = BytesIO(), BytesIO()
+        Image.new("RGB", (740, 490), "#cb3333").save(first, "JPEG")
+        Image.new("RGB", (740, 490), "#246cb1").save(second, "JPEG")
+        slide = story_triptych([first.getvalue(), second.getvalue()], "Artwork", "Artist")[1]
+        with Image.open(BytesIO(slide)) as image:
+            for y in (370, 850, 1390):
+                r, g, b = image.getpixel((540, y))
+                self.assertGreater(b, r + 35)
+
     def test_luxury_and_cinematic_reels_use_distinct_frames(self):
         art = Image.new("RGB", (580, 420), "#ab9582")
         f1 = draw_frame(4, [art, art], "Artwork", "Artist", "cinematic")

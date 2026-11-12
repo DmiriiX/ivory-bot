@@ -70,7 +70,7 @@ async def prepare(post, existing, style):
             "gallery_source": source, "images": photos, "reel": reel,
             "reel_style": style if reel else None,
             "stories": story_urls, "story": story_urls[0],
-            "creative_version": 3,
+            "creative_version": 4,
             "music": "Original IVORY ART instrumental ambient: " + style,
             "reel_fps": 30 if reel else None}
 
@@ -87,7 +87,7 @@ async def main(limit):
     retries = [p for p in posts if identity(p) in records and
                (not records[identity(p)].get("reel") or not records[identity(p)].get("story")
                 or records[identity(p)].get("reel_fps", 0) < 23
-                or records[identity(p)].get("creative_version", 0) < 3)]
+                or records[identity(p)].get("creative_version", 0) < 4)]
     scan = retries[:12] + [posts[(cursor + offset) % len(posts)] for offset in range(min(12, len(posts)))]
     for post in scan:
         ident = identity(post)
@@ -95,7 +95,7 @@ async def main(limit):
         style = 'cinematic' if posts.index(post) % 2 == 0 else 'luxury'
         if (ident in records and records[ident].get("reel") and records[ident].get("story")
                 and records[ident].get("reel_fps", 0) >= 23
-                and records[ident].get("creative_version", 0) >= 3):
+                and records[ident].get("creative_version", 0) >= 4):
             continue
         try:
             result = await prepare(post, records.get(ident), style)

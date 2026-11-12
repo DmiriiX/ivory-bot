@@ -115,6 +115,8 @@ dialog::backdrop{background:#000b}
 <small>Цикл ленты: факт → картина → картина. Расписание предварительное, доставка зависит от Buffer.</small></div>
 <div class="between"><h2>Публикации Instagram · предпросмотр и тексты</h2><small id="igfacts-total"></small></div>
 <div class="filters"><button class="active" data-igfacts-filter="planned">По графику</button><button data-igfacts-filter="queue">Ожидают</button><button data-igfacts-filter="sent">Отправлены</button><button data-igfacts-filter="all">Все</button></div>
+<div class="filters" aria-label="Формат публикации"><button class="active" data-igformat="all">Все форматы</button><button data-igformat="story">Stories</button><button data-igformat="reel">Reels</button><button data-igformat="carousel">Карусели</button><button data-igformat="post">Посты</button><button data-igformat="fact">Факты</button></div>
+<div class="tools"><label for="ig-sort">Порядок в календаре</label><select id="ig-sort" aria-label="Порядок публикаций"><option value="asc">Сначала ближайшие</option><option value="desc">Сначала поздние</option></select></div>
 <div id="igfacts-list"><div class="placeholder">Загрузка публикаций…</div></div>
 <div class="panel"><h2>Статистика Instagram</h2><small id="ig-main-metrics-time">Нет данных</small><div id="ig-main-metrics-list" style="display:grid;gap:10px;margin-top:12px"></div><small>Данные Buffer обновляются примерно раз в сутки. Пустое значение не означает ноль.</small></div>
 </section>
@@ -142,7 +144,7 @@ dialog::backdrop{background:#000b}
 <script>
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const init=tg?.initData||"";const $=id=>document.getElementById(id);
-const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null,igFacts:null,igFactFilter:"planned",igFactEdit:null,igFactSlideEdit:null};
+const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null,igFacts:null,igFactFilter:"planned",igFormatFilter:"all",igSort:"asc",igFactEdit:null,igFactSlideEdit:null};
 function showSection(kind){
  $("instagram-section").hidden=true;
  $("igfacts-section").hidden=kind!=="igfacts";
@@ -320,7 +322,9 @@ function renderEditorial(){
  }
  const mode=state.igFactFilter;
  const all=[...planned,...extras];
- const shown=all.filter(item=>mode==="all"||mode==="planned"&&item.status==="planned"||mode==="queue"&&["planned","queue"].includes(item.status)||mode==="sent"&&["sent","accepted","failed","uncertain","error"].includes(item.status));
+ const shown=all.filter(item=>(mode==="all"||mode==="planned"&&item.status==="planned"||mode==="queue"&&["planned","queue"].includes(item.status)||mode==="sent"&&["sent","accepted","failed","uncertain","error"].includes(item.status))
+  &&(state.igFormatFilter==="all"||state.igFormatFilter==="fact"&&item.kind==="fact"||state.igFormatFilter==="carousel"&&item.kind!=="fact"&&item.format==="carousel"||!["fact","carousel"].includes(state.igFormatFilter)&&item.format===state.igFormatFilter));
+ shown.sort((a,b)=>{const at=a.at||"",bt=b.at||"";if(!at)return bt?1:0;if(!bt)return -1;return state.igSort==="desc"?bt.localeCompare(at):at.localeCompare(bt)});
  text($("igfacts-total"),shown.length+" публикаций");
  const list=$("igfacts-list");list.replaceChildren();
  for(const item of shown){
@@ -387,6 +391,12 @@ for(const b of document.querySelectorAll("[data-igfacts-filter]"))b.onclick=()=>
  document.querySelectorAll("[data-igfacts-filter]").forEach(x=>x.classList.toggle("active",x===b));
  renderEditorial()
 };
+for(const b of document.querySelectorAll("[data-igformat]"))b.onclick=()=>{
+ state.igFormatFilter=b.dataset.igformat;
+ document.querySelectorAll("[data-igformat]").forEach(x=>x.classList.toggle("active",x===b));
+ renderEditorial()
+};
+$("ig-sort").onchange=e=>{state.igSort=e.target.value;renderEditorial()};
 for(const b of document.querySelectorAll("[data-kind]"))b.onclick=()=>{
  state.kind=b.dataset.kind;showSection(state.kind);err("");
  if(state.kind==="instagram"){checkInstagram();return}
