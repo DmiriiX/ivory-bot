@@ -20,9 +20,10 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
 from instagram_gallery import discover_gallery, format_for_gallery
+from instagram_facts import FACTS, fact_caption, fact_key, fact_media, next_fact, feed_calendar, cycle_next_kind
 from instagram_editorial import make_editorial_reel
 from schedule_info import next_post, next_instagram_check, next_instagram_publication, next_instagram_story
-from instagram import inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story
+from instagram import post_caption as instagram_post_caption, inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -371,6 +372,136 @@ async def publish(kind: Literal["facts", "paintings"], x_telegram_init_data: str
         "inputs": {"dry_run": "false", "force_post": "true"},
     })
     return {"started": True, "note": "GitHub accepted workflow dispatch; delivery is not yet confirmed"}
+
+class InstagramEditorialSwitch(BaseModel):
+    enabled: bool
+
+class InstagramEditorialExclude(BaseModel):
+    id: int = Field(ge=1, le=10000)
+    excluded: bool
+
+class InstagramEditorialSelect(BaseModel):
+    id: int = Field(ge=1, le=10000)
+
+class InstagramEditorialEdit(BaseModel):
+    kind: Literal["fact","artwork"]
+    id: str = Field(min_length=1,max_length=80)
+    caption: str = Field(min_length=15,max_length=2200)
+
+
+@app.get("/api/integrations/instagram/editorial")
+async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    history, _ = await read_file("paintings","instagram_state.json")
+    facts,_ = await read_file("facts","posts.json")
+    artworks,_ = await read_file("paintings","posts.json")
+    records=history.get("records") or {}
+    exclusions=set(str(i) for i in history.get("ig_fact_excluded",[]))
+    overrides=history.get("ig_fact_captions") or {}
+    return {
+        "facts_enabled":bool(history.get("ig_facts_enabled",False)),
+        "next_kind":cycle_next_kind(history) if history.get("ig_facts_enabled") else "artwork",
+        "calendar":feed_calendar(history,facts),
+        "facts":[
+            {"id":str(f["id"]),"title":f.get("title"),"photo":fact_media(f),
+             "caption":overrides.get(str(f["id"])) or fact_caption(f),
+             "excluded":str(f["id"]) in exclusions,
+             "status":(records.get(fact_key(f)) or {}).get("status","queue")}
+            for f in facts if int(f.get("id",0)) in FACTS],
+        "artworks":[
+            {"id":identity("paintings",p),"title":p.get("title"),"artist":p.get("artist"),
+             "photo":p.get("photo"),"caption":(history.get("ig_artwork_captions") or {}).get(identity("paintings",p)) or instagram_post_caption(p),
+             "status":(records.get(identity("paintings",p)) or {}).get("status","queue")}
+            for p in artworks],
+        "selected_fact_id":str((next_fact(facts,history) or {}).get("id") or ""),
+    }
+
+
+@app.post("/api/integrations/instagram/editorial/toggle")
+async def instagram_editorial_toggle(data:InstagramEditorialSwitch,
+                                     x_telegram_init_data:str=Header(default="")):
+    authenticate(x_telegram_init_data)
+    history,sha=await read_file("paintings","instagram_state.json")
+    if data.enabled:
+        facts,_=await read_file("facts","posts.json")
+        first=next_fact(facts,history)
+        if not first:
+            raise HTTPException(409,"No available Instagram facts")
+        # Confirm the next fact card exists before enabling scheduled publication.
+        async with httpx.AsyncClient(timeout=15,follow_redirects=True) as client:
+            try:
+                result=await client.head(fact_media(first))
+                if result.status_code!=200 or not result.headers.get("content-type","").startswith("image/"):
+                    raise HTTPException(409,"Instagram Fact image not yet prepared")
+            except httpx.HTTPError as exc:
+                raise HTTPException(409,"Instagram Fact media inaccessible") from exc
+    if any(v.get("status") in ("uncertain","accepted") for v in (history.get("records") or {}).values()):
+        raise HTTPException(409,"Finish pending Instagram delivery first")
+    history["ig_facts_enabled"]=data.enabled
+    await update_file("paintings","instagram_state.json",history,sha,
+                      "Admin: "+("enable" if data.enabled else "pause")+" independent Instagram facts [skip ci]")
+    return {"enabled":data.enabled}
+
+
+@app.post("/api/integrations/instagram/editorial/caption")
+async def instagram_editorial_caption(data:InstagramEditorialEdit,
+                                      x_telegram_init_data:str=Header(default="")):
+    authenticate(x_telegram_init_data)
+    history,sha=await read_file("paintings","instagram_state.json")
+    records=history.get("records") or {}
+    if data.kind=="fact":
+        facts,_=await read_file("facts","posts.json")
+        if data.id not in {str(f.get("id")) for f in facts}:
+            raise HTTPException(404,"Unknown fact")
+        if fact_key({"id":data.id}) in records:
+            raise HTTPException(409,"This fact is reserved or already published; cannot edit")
+        target="ig_fact_captions"
+    else:
+        posts,_=await read_file("paintings","posts.json")
+        if data.id not in {identity("paintings",p) for p in posts}:
+            raise HTTPException(404,"Unknown artwork")
+        if data.id in records:
+            raise HTTPException(409,"This artwork is reserved or already published")
+        target="ig_artwork_captions"
+    history.setdefault(target,{})[data.id]=data.caption.strip()
+    await update_file("paintings","instagram_state.json",history,sha,
+                      "Admin: update Instagram-only "+data.kind+" draft [skip ci]")
+    return {"ok":True,"kind":data.kind,"id":data.id}
+
+
+@app.post("/api/integrations/instagram/editorial/exclude")
+async def instagram_editorial_exclude(data:InstagramEditorialExclude,
+                                      x_telegram_init_data:str=Header(default="")):
+    authenticate(x_telegram_init_data)
+    facts,_=await read_file("facts","posts.json")
+    if data.id not in {int(f["id"]) for f in facts}:
+        raise HTTPException(404,"Unknown fact")
+    history,sha=await read_file("paintings","instagram_state.json")
+    excluded=set(str(x) for x in history.get("ig_fact_excluded",[]))
+    if fact_key({"id":data.id}) in (history.get("records") or {}):
+        raise HTTPException(409,"Fact already reserved")
+    (excluded.add if data.excluded else excluded.discard)(str(data.id))
+    history["ig_fact_excluded"]=sorted(excluded,key=int)
+    await update_file("paintings","instagram_state.json",history,sha,
+                      "Admin: update excluded Instagram-only facts [skip ci]")
+    return {"ok":True}
+
+
+@app.post("/api/integrations/instagram/editorial/next")
+async def instagram_editorial_next(data:InstagramEditorialSelect,
+                                   x_telegram_init_data:str=Header(default="")):
+    authenticate(x_telegram_init_data)
+    history,sha=await read_file("paintings","instagram_state.json")
+    facts,_=await read_file("facts","posts.json")
+    if data.id not in {int(f["id"]) for f in facts} or fact_key({"id":data.id}) in (history.get("records") or {}):
+        raise HTTPException(409,"Fact unavailable")
+    if str(data.id) in set(str(x) for x in history.get("ig_fact_excluded",[])):
+        raise HTTPException(409,"Fact is excluded")
+    history["ig_fact_next_id"]=data.id
+    await update_file("paintings","instagram_state.json",history,sha,
+                      "Admin: choose next Instagram fact without changing TG/MAX [skip ci]")
+    return {"ok":True}
+
 
 @app.get("/api/integrations/instagram")
 async def instagram_status(x_telegram_init_data: str = Header(default="")):
