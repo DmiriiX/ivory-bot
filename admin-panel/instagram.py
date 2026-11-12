@@ -288,7 +288,7 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
         expected = post.get("fact_slide_urls") or []
         if (not identifier.isdigit() or len(links) != 4 or links != expected
                 or not all(re.fullmatch(re.escape(prefix)+r"fact-"+identifier.zfill(2)
-                    +r"-[1-4](?:-[0-9a-f]{12})?\\.jpg", u) for u in links)):
+                    +r"-[1-4](?:-[0-9a-f]{12})?\.jpg", u) for u in links)):
             raise ValueError("Instagram Fact must have 4 verified editorial slides")
         assets = [{"image": {"url": link}} for link in links]
         kind = "carousel"
