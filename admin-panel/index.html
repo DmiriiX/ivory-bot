@@ -134,13 +134,22 @@ dialog::backdrop{background:#000b}
 <div class="filters"><button class="active" data-filter="queue">Ожидают</button><button data-filter="used">Использованы</button><button data-filter="excluded">Исключены</button><button data-filter="all">Все</button></div>
 <div id="list"><div class="placeholder">Загрузка записей…</div></div>
 </section>
+<dialog id="igfacts-slide-editor">
+<h2>Текст на слайдах факта</h2><p id="igfacts-slide-edit-title"></p>
+<label for="igfacts-slide-en">Слайд 2 - English</label>
+<textarea id="igfacts-slide-en" rows="5" maxlength="360" style="min-height:145px"></textarea>
+<label for="igfacts-slide-ru">Слайд 3 - Русский</label>
+<textarea id="igfacts-slide-ru" rows="5" maxlength="360" style="min-height:145px"></textarea>
+<small>Крупный шрифт сохранится автоматически. После сохранения GitHub пересоберёт четыре изображения. Если отдельно меняли подпись Instagram, проверьте её соответствие текстам слайдов.</small>
+<div class="tools"><button id="igfacts-slide-save" class="primary">Обновить слайды</button><button id="igfacts-slide-cancel">Отмена</button></div>
+</dialog>
 <dialog id="igfacts-editor"><h2>Текст для Instagram</h2><p id="igfacts-edit-title"></p><textarea id="igfacts-edit-text" rows="13" style="min-height:300px"></textarea><small>Английский блок первым, русский вторым. Хештеги внутри текста. Изменения действуют только на будущие публикации Instagram.</small><div class="tools"><button id="igfacts-save" class="primary">Сохранить</button><button id="igfacts-cancel">Отмена</button></div></dialog>
 <dialog id="editor"><h2>Редактировать текст</h2><p id="edit-title"></p><textarea id="edit-text"></textarea><div class="tools"><button id="save" class="primary">Сохранить</button><button id="cancel">Отмена</button></div></dialog>
 </main>
 <script>
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const init=tg?.initData||"";const $=id=>document.getElementById(id);
-const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null,igFacts:null,igFactFilter:"queue",igFactEdit:null};
+const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null,igFacts:null,igFactFilter:"queue",igFactEdit:null,igFactSlideEdit:null};
 function showSection(kind){
  $("instagram-section").hidden=kind!=="instagram";
  $("igfacts-section").hidden=kind!=="igfacts";
@@ -332,7 +341,14 @@ function renderEditorial(){
    body.append(slides);
   }
   const actions=document.createElement("div");actions.className="actions";
-  actions.append(button("Полный текст / изменить",()=>editorialEdit("fact",p)));
+  actions.append(button("Подпись / изменить",()=>editorialEdit("fact",p)));
+  if(p.status==="queue")actions.append(button("Текст слайдов EN / RU",()=>{
+    state.igFactSlideEdit=p;
+    text($("igfacts-slide-edit-title"),"Факт №"+p.id+" · "+p.title);
+    $("igfacts-slide-en").value=p.slide_en||"";
+    $("igfacts-slide-ru").value=p.slide_ru||"";
+    $("igfacts-slide-editor").showModal();
+  }));
   if(p.status==="queue"){
    actions.append(button(p.excluded?"Вернуть":"Исключить",async()=>{try{await api("/api/integrations/instagram/editorial/exclude",{id:Number(p.id),excluded:!p.excluded});await loadEditorial()}catch(e){err(e.message)}}));
    if(!p.excluded)actions.append(button("Следующий",async()=>{try{await api("/api/integrations/instagram/editorial/next",{id:Number(p.id)});await loadEditorial()}catch(e){err(e.message)}}));
@@ -347,6 +363,21 @@ function renderEditorial(){
 }
 $("igfacts-refresh").onclick=loadEditorial;
 $("igfacts-cancel").onclick=()=>$("igfacts-editor").close();
+$("igfacts-slide-cancel").onclick=()=>$("igfacts-slide-editor").close();
+$("igfacts-slide-save").onclick=async()=>{
+ const p=state.igFactSlideEdit;if(!p)return;
+ const en=$("igfacts-slide-en").value.trim(),ru=$("igfacts-slide-ru").value.trim();
+ if(en.length<20||ru.length<20){err("Каждый язык: минимум 20 символов");return}
+ if(!confirm("Обновить текст двух слайдов? Генератор создаст новые изображения; пока они не готовы, факт не будет отправлен."))return;
+ const btn=$("igfacts-slide-save");btn.disabled=true;
+ try{
+  await api("/api/integrations/instagram/editorial/slides",{id:Number(p.id),en,ru});
+  $("igfacts-slide-editor").close();
+  await loadEditorial();
+  err("Тексты сохранены. Новые версии четырёх слайдов подготавливаются. Перед публикацией откройте изображения для проверки.");
+ }catch(e){err(e.message)}
+ finally{btn.disabled=false}
+};
 $("igfacts-save").onclick=async()=>{
  const p=state.igFactEdit;if(!p)return;
  const caption=$("igfacts-edit-text").value.trim();
