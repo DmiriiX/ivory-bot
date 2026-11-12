@@ -102,7 +102,7 @@ def feed_calendar(state,facts,now=None,count=12,artworks=None,media=None):
         slot=campaign_slot(campaign,"feed",date_cursor)
         if not slot.get("next_at"):break
         dt=datetime.fromisoformat(slot["next_at"])
-        date_cursor=dt+timedelta(minutes=91)
+        date_cursor=dt+timedelta(hours=5,minutes=31)
         if dt.date().isoformat() in existing_dates:continue
         kind="fact" if state.get("ig_facts_enabled") and sequence%3==0 else "artwork"
         if kind=="fact":

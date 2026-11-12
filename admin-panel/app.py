@@ -717,6 +717,16 @@ async def instagram_sync(request: Request, authorization: str = Header(default="
     return await sync_instagram(read_file, update_file, identity, gh)
 
 
+@app.post("/api/integrations/instagram/publish")
+async def instagram_publish(x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    # Manual action skips the clock, but keeps all delivery and date guards.
+    result = await sync_instagram(read_file, update_file, identity, gh, manual=True)
+    if not result.get("ok"):
+        raise HTTPException(409, result.get("reason") or "Instagram publication needs review")
+    return result
+
+
 @app.post("/internal/instagram/stories")
 async def instagram_stories_sync(authorization: str = Header(default="")):
     if not authorization.startswith("Bearer "):

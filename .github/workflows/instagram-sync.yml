@@ -1,10 +1,11 @@
 name: Sync newly published paintings to Instagram via Buffer
 on:
   schedule:
-    # Multiple checks for GitHub cron delays, while backend ensures one post per date.
-    # 18:20 / 18:40 / 19:05 Moscow during the 18:15-19:45 campaign window.
-    - cron: "20,40 15 * * *"
-    - cron: "5 16 * * *"
+    # GitHub cron can be delayed. The backend reserves one feed post per
+    # Moscow date and closes the evening retry window at 23:45.
+    - cron: "0,15,30,45 15-20 * * 0,2,4,6"
+    # The first campaign Monday is a feed day; other Mondays are harmless.
+    - cron: "0,15,30,45 15-20 * * 1"
   workflow_dispatch:
   push:
     paths:

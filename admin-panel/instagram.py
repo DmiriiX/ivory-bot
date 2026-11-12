@@ -337,7 +337,7 @@ async def get_buffer_status(buffer_post_id):
     )
     return data["post"]
 
-async def sync_instagram(read_file, update_file, identity, github_api):
+async def sync_instagram(read_file, update_file, identity, github_api, manual=False):
     """One accepted post maximum per run; never resubmit uncertain or accepted IDs."""
     state, sha = await read_file("paintings", "instagram_state.json")
     result = await inspection()
@@ -384,7 +384,7 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     in_campaign = bool(campaign.get("enabled"))
     now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
     if in_campaign:
-        if not due_now(campaign, "feed", now_msk):
+        if not manual and not due_now(campaign, "feed", now_msk):
             return {"ok": True, "reason": "No campaign feed slot today",
                     "next_publication": next_instagram_publication(state)}
         if any((rec.get("campaign_date") == now_msk.date().isoformat())
@@ -393,7 +393,7 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     else:
         today_slot = next_instagram_publication(
             state, now=now_msk.replace(hour=18, minute=14, second=0, microsecond=0))
-        if (now_msk.hour != 18 or now_msk.minute < 15
+        if not manual and (now_msk.hour != 18 or now_msk.minute < 15
                 or not today_slot.get("next_at")
                 or datetime.fromisoformat(today_slot["next_at"]).date() != now_msk.date()):
             return {"ok": True, "reason": "Instagram cadence: next publishing slot",

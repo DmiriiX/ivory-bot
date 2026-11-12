@@ -36,6 +36,12 @@ class UpcomingScheduleTests(unittest.TestCase):
         self.assertEqual(slot["next_at"], "2026-11-11T18:15:00+03:00")
         self.assertEqual(slot["reason"], "scheduled")
 
+    def test_campaign_dashboard_advances_after_today_reserved(self):
+        history={"enabled":True,"campaign":{"enabled":True,"start_date":"2026-11-09","end_date":"2026-12-08"},
+                 "records":{"igfact:1":{"campaign_date":"2026-11-12","status":"sent"}}}
+        slot=next_instagram_publication(history,now=datetime(2026,11,12,20,0,tzinfo=MSK))
+        self.assertEqual(slot["next_at"],"2026-11-14T18:15:00+03:00")
+
     def test_instagram_held_when_delivery_unknown(self):
         history = {"enabled": True, "records": {"a": {"status": "uncertain"}}}
         self.assertEqual(next_instagram_publication(history)["reason"], "pending")

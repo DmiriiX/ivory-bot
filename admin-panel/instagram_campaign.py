@@ -22,7 +22,7 @@ def campaign_window(state, now=None):
 
 
 def campaign_slot(state, kind="feed", now=None):
-    """Next slot, or the current slot if within a 90-minute startup tolerance."""
+    """Next slot, or today's feed slot during the evening retry window."""
     if not state.get("enabled", False):
         return {"next_at": None, "reason": "paused"}
     now = (now or datetime.now(MSK)).astimezone(MSK)
@@ -45,7 +45,8 @@ def campaign_slot(state, kind="feed", now=None):
         elif day.weekday() not in weekdays:
             continue
         slot = datetime.combine(day, tm, tzinfo=MSK)
-        if slot + timedelta(minutes=90) > now:
+        tolerance = timedelta(hours=5, minutes=30) if kind == "feed" else timedelta(minutes=90)
+        if slot + tolerance > now:
             return {"next_at": slot.isoformat(), "reason": "scheduled",
                     "timezone": "Europe/Moscow",
                     "note": "Плановый слот, доставка зависит от Buffer"}
@@ -58,7 +59,8 @@ def due_now(state, kind="feed", now=None):
     if not scheduled.get("next_at"):
         return False
     instant = datetime.fromisoformat(scheduled["next_at"])
-    return instant <= now < instant + timedelta(minutes=90)
+    tolerance = timedelta(hours=5, minutes=30) if kind == "feed" else timedelta(minutes=90)
+    return instant <= now < instant + tolerance
 
 
 def feed_format(records, available):

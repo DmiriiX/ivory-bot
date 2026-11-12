@@ -35,6 +35,12 @@ class RecoveryCampaignTests(unittest.TestCase):
                 actual.append(day)
         self.assertEqual(actual, [10, 12, 14, 15])
 
+    def test_late_github_cron_can_catch_evening_feed_only(self):
+        self.assertFalse(due_now(self.campaign, "feed", datetime(2026, 11, 12, 18, 14, tzinfo=MSK)))
+        self.assertTrue(due_now(self.campaign, "feed", datetime(2026, 11, 12, 23, 44, tzinfo=MSK)))
+        self.assertFalse(due_now(self.campaign, "feed", datetime(2026, 11, 12, 23, 45, tzinfo=MSK)))
+        self.assertFalse(due_now(self.campaign, "feed", datetime(2026, 11, 13, 0, 1, tzinfo=MSK)))
+
     def test_story_slots_do_not_count_as_feed(self):
         stamp = datetime(2026, 11, 11, 19, 25, tzinfo=MSK)
         self.assertTrue(due_now(self.campaign, "story", now=stamp))

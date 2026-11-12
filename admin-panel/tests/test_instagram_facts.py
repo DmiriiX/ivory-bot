@@ -50,6 +50,7 @@ class FactsEditorialTests(unittest.TestCase):
   self.assertEqual(plan[0]["id"],"1")
   self.assertEqual(plan[3]["id"],"2")
   self.assertTrue(all(x["at"].endswith("+03:00") for x in plan))
+  self.assertEqual(len({x["at"][:10] for x in plan}),4)
 
  def test_calendar_predicts_actual_artworks_and_media_types(self):
   from instagram_facts import artwork_key
@@ -115,6 +116,26 @@ class FactsEditorialTests(unittest.TestCase):
     result=await instagram.create_buffer_post("channel",post,post["photo"])
     self.assertEqual(result["id"],"remote")
     self.assertEqual(call.call_args.args[1]["input"]["text"],post["instagram_caption"])
+  asyncio.run(check())
+
+ def test_manual_send_skips_clock_but_keeps_daily_reservation(self):
+  import asyncio
+  from zoneinfo import ZoneInfo
+  async def check():
+   fixed=datetime(2026,11,13,12,0,tzinfo=ZoneInfo("Europe/Moscow"))  # Friday, no feed slot
+   state={"enabled":True,"campaign":CAMPAIGN,"ig_facts_enabled":True,"records":{}}
+   async def read(kind,path):
+    if path=="instagram_state.json":return state,"sha"
+    if path=="posts.json" and kind=="facts":return [],"sha"
+    return ([] if path=="posts.json" else {}),"sha"
+   with patch.object(instagram,"datetime") as clock,patch.object(instagram,"inspection",new=AsyncMock(return_value={"connected":True})),patch.object(instagram,"create_buffer_post",new=AsyncMock()) as send:
+    clock.now.return_value=fixed
+    result=await instagram.sync_instagram(read,AsyncMock(),lambda *args:"unused",None,manual=True)
+    self.assertEqual(result["reason"],"Instagram facts queue exhausted; review before publishing artwork")
+    state["records"]={"already":{"campaign_date":"2026-11-13","status":"sent"}}
+    result=await instagram.sync_instagram(read,AsyncMock(),lambda *args:"unused",None,manual=True)
+    self.assertEqual(result["reason"],"Feed slot already reserved today")
+    send.assert_not_called()
   asyncio.run(check())
 
 if __name__=="__main__":unittest.main()
