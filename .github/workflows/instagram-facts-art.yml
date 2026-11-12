@@ -4,6 +4,7 @@ on:
     paths:
       - ".github/instagram-fact-cards-trigger.txt"
       - "instagram_fact_slide_overrides.json"
+      - "scripts/prepare_instagram_facts.py"
   workflow_dispatch:
 permissions:
   contents: write

@@ -138,4 +138,54 @@ class FactsEditorialTests(unittest.TestCase):
     send.assert_not_called()
   asyncio.run(check())
 
+ def test_selected_fact_posts_exact_id_even_when_another_slot_used_today(self):
+  import asyncio
+  from zoneinfo import ZoneInfo
+  async def check():
+   state={"enabled":True,"campaign":CAMPAIGN,"ig_facts_enabled":True,
+          "records":{"igfact:1":{"status":"sent","campaign_date":"2026-11-12","editorial_cycle":True}}}
+   async def read(kind,path):
+    if path=="instagram_state.json":return state,"sha"
+    if path=="posts.json":return (FACT_LIST if kind=="facts" else []),"sha"
+    if path=="instagram_fact_slide_overrides.json":return {},"sha"
+    return {},"sha"
+   async def update(*args):return {"content":{"sha":"sha"}}
+   sender=AsyncMock(return_value={"id":"buffer-two","status":"sending"})
+   with patch.object(instagram,"inspection",new=AsyncMock(return_value={"connected":True})), \
+        patch.object(instagram,"unavailable_fact_slide",new=AsyncMock(return_value=None)), \
+        patch.object(instagram,"instagram_channel",new=AsyncMock(return_value={"id":"channel"})), \
+        patch.object(instagram,"create_buffer_post",new=sender):
+    result=await instagram.sync_instagram(read,update,lambda *args:"unused",None,manual=True,
+                    selected_kind="fact",selected_id="2",selected_format="carousel")
+   self.assertEqual(result["id"],"igfact:2")
+   self.assertEqual(sender.await_count,1)
+   self.assertEqual(sender.call_args.kwargs["kind"],"fact_carousel")
+  asyncio.run(check())
+
+ def test_selected_artwork_keeps_requested_reel_format(self):
+  import asyncio
+  from instagram_facts import artwork_key
+  async def check():
+   post={"title":"Work","artist":"Artist","photo":"https://static.tildacdn.com/art.jpg",
+         "link":"https://ivory-art.com/#ia-product-123456789000"}
+   art_id=artwork_key(post)
+   asset={"images":["one.jpg","two.jpg"],"image_count":2,"reel":"movie.mp4","reel_style":"cinematic"}
+   state={"enabled":True,"campaign":CAMPAIGN,"records":{}}
+   async def read(kind,path):
+    values={"instagram_state.json":state,"state.json":{},"posts.json":[post],"control.json":{},
+            "instagram_assets.json":{"artworks":{art_id:asset}}}
+    return values[path],"sha"
+   sender=AsyncMock(return_value={"id":"buffer-reel","status":"sending"})
+   with patch.object(instagram,"inspection",new=AsyncMock(return_value={"connected":True})), \
+        patch.object(instagram,"prepared_media_ready",new=AsyncMock(return_value=True)), \
+        patch.object(instagram,"instagram_channel",new=AsyncMock(return_value={"id":"channel"})), \
+        patch.object(instagram,"create_buffer_post",new=sender):
+    result=await instagram.sync_instagram(read,AsyncMock(return_value={"content":{"sha":"sha"}}),
+                    lambda kind,p:art_id,None,manual=True,selected_kind="artwork",
+                    selected_id=art_id,selected_format="reel")
+   self.assertEqual(result["status"],"accepted")
+   self.assertEqual(state["records"][art_id]["format"],"reel")
+   self.assertEqual(sender.call_args.kwargs["kind"],"reel")
+  asyncio.run(check())
+
 if __name__=="__main__":unittest.main()

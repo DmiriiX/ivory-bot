@@ -81,6 +81,20 @@ class StoryTriptychTests(unittest.TestCase):
         self.assertEqual(sender.await_count,2)
         self.assertEqual(len(state["story_records"]),2)
 
+    def test_selected_story_can_be_sent_outside_scheduled_window(self):
+        state,read_file,update_file=self.mock_backend()
+        sender=AsyncMock(side_effect=[{"id":str(i),"status":"sending"} for i in range(3)])
+        async def run():
+            with patch.object(instagram,"due_now",return_value=False), \
+                 patch.object(instagram,"instagram_channel",new=AsyncMock(return_value={"id":"ch"})), \
+                 patch.object(instagram,"create_buffer_post",new=sender), \
+                 patch.object(instagram.httpx,"AsyncClient",return_value=FakeClient()):
+                return await instagram.sync_instagram_story(
+                    read_file,update_file,lambda kind,post:ARTWORK,manual=True,artwork_id=ARTWORK)
+        result=asyncio.run(run())
+        self.assertEqual(result["slides_accepted"],3)
+        self.assertEqual(sender.await_count,3)
+
 
 if __name__=="__main__":
     unittest.main()

@@ -337,7 +337,8 @@ async def get_buffer_status(buffer_post_id):
     )
     return data["post"]
 
-async def sync_instagram(read_file, update_file, identity, github_api, manual=False):
+async def sync_instagram(read_file, update_file, identity, github_api, manual=False,
+                         selected_kind=None, selected_id=None, selected_format=None):
     """One accepted post maximum per run; never resubmit uncertain or accepted IDs."""
     state, sha = await read_file("paintings", "instagram_state.json")
     result = await inspection()
@@ -356,7 +357,7 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
     records = state.setdefault("records", {})
     # Optional staged media extension. Default false until verified on actual products.
     rich_index = {"artworks": {}}
-    if state.get("rich_media_enabled", False):
+    if state.get("rich_media_enabled", False) or (manual and selected_id):
         try:
             rich_index, _ = await read_file("paintings", "instagram_assets.json")
         except Exception:
@@ -387,7 +388,7 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
         if not manual and not due_now(campaign, "feed", now_msk):
             return {"ok": True, "reason": "No campaign feed slot today",
                     "next_publication": next_instagram_publication(state)}
-        if any((rec.get("campaign_date") == now_msk.date().isoformat())
+        if not (manual and selected_id) and any((rec.get("campaign_date") == now_msk.date().isoformat())
                for rec in records.values()):
             return {"ok": True, "reason": "Feed slot already reserved today"}
     else:
@@ -400,12 +401,18 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
                     "next_publication": next_instagram_publication(state)}
     # Independent Instagram editorial series. It starts at fact #1 regardless
     # of what Telegram/MAX facts bot has already posted. No IG history reset.
-    if in_campaign and state.get("ig_facts_enabled") and cycle_next_kind(state) == "fact":
+    if (selected_kind == "fact" or
+            (not selected_kind and in_campaign and state.get("ig_facts_enabled")
+             and cycle_next_kind(state) == "fact")):
         facts, _ = await read_file("facts", "posts.json")
-        fact = next_fact(facts, state)
+        fact = (next((p for p in facts if str(p.get("id")) == selected_id), None)
+                if selected_id else next_fact(facts, state))
         if not fact:
             return {"ok": True, "reason": "Instagram facts queue exhausted; review before publishing artwork"}
         item_id = fact_key(fact)
+        if (item_id in records or str(fact["id"]) in
+                {str(x) for x in state.get("ig_fact_excluded", [])}):
+            return {"ok": True, "reason": "This fact is already used or excluded"}
         try:
             edits, _ = await read_file("paintings", "instagram_fact_slide_overrides.json")
         except Exception:
@@ -458,7 +465,15 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
                            and one_shot_id in used and one_shot_id not in records), None)
     available = {k: v for k, v in (rich_index.get("artworks") or {}).items()
                  if len(v.get("images") or []) >= 2}
-    if in_campaign:
+    if selected_kind == "artwork":
+        new = next((p for p in posts if identity("paintings", p) == selected_id), None)
+        if not new or selected_id in records or selected_id in ignored:
+            return {"ok": True, "reason": "This artwork is unavailable or already used"}
+        prepared = available.get(selected_id)
+        if selected_format in ("carousel", "reel") and (not prepared or
+                not await prepared_media_ready(prepared, selected_format)):
+            return {"ok": False, "reason": "Selected Instagram media is not ready"}
+    elif in_campaign:
         # Reels alternate Cinematic / Luxury; only choose prepared artwork with
         # the next style if available, never repeat a previous product.
         next_format = feed_format(records, {"carousel", "reel"})
@@ -505,7 +520,9 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
     try:
         prepared = (rich_index.get("artworks") or {}).get(item_id)
         chosen = "post"
-        if prepared and prepared.get("image_count", 0) >= 2:
+        if selected_kind == "artwork":
+            chosen = selected_format or "post"
+        elif prepared and prepared.get("image_count", 0) >= 2:
             if in_campaign:
                 available_formats = {"carousel"}
                 if prepared.get("reel"):
@@ -553,7 +570,7 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
     return {"ok": True, "id": item_id, "status": "accepted"}
 
 
-async def sync_instagram_story(read_file, update_file, identity):
+async def sync_instagram_story(read_file, update_file, identity, manual=False, artwork_id=None):
     """Publish an editorial three-slide Story sequence, never repeating uncertain sends.
 
     Each slide has its own durable reservation/Buffer ID on the runtime-only
@@ -562,7 +579,7 @@ async def sync_instagram_story(read_file, update_file, identity):
     state, sha = await read_file("paintings", "instagram_state.json")
     campaign = state.get("campaign") or {}
     now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
-    if not state.get("enabled") or not due_now(campaign, "story", now_msk):
+    if not state.get("enabled") or (not manual and not due_now(campaign, "story", now_msk)):
         return {"ok": True, "reason": "No Story campaign slot"}
 
     today = now_msk.date().isoformat()
@@ -604,7 +621,16 @@ async def sync_instagram_story(read_file, update_file, identity):
     posts, _ = await read_file("paintings", "posts.json")
     rich, _ = await read_file("paintings", "instagram_assets.json")
     assets = rich.get("artworks") or {}
-    if existing_artworks:
+    if artwork_id and existing_artworks and artwork_id not in existing_artworks:
+        return {"ok": False, "reason": "A different Story series is already reserved today"}
+    if artwork_id and not existing_artworks:
+        published = state.get("records") or {}
+        if (published.get(artwork_id) or {}).get("status") != "sent":
+            return {"ok": False, "reason": "Publish the artwork to the Instagram feed before its Story"}
+        if artwork_id in {v.get("artwork_id") for v in records.values()}:
+            return {"ok": False, "reason": "Story for this artwork has already been used"}
+        selected = artwork_id
+    elif existing_artworks:
         selected = next(iter(existing_artworks))
     else:
         # Only work from already-confirmed Instagram feed publications.

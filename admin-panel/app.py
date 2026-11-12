@@ -402,7 +402,7 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
     artworks,_ = await read_file("paintings","posts.json")
     try:
         prepared,_=await read_file("paintings","instagram_assets.json")
-        prepared=(prepared.get("artworks") or {}) if history.get("rich_media_enabled") else {}
+        prepared=prepared.get("artworks") or {}
     except HTTPException:
         prepared={}
     records=history.get("records") or {}
@@ -431,7 +431,14 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
         "artworks":[
             {"id":identity("paintings",p),"title":p.get("title"),"artist":p.get("artist"),
              "photo":p.get("photo"),"caption":(history.get("ig_artwork_captions") or {}).get(identity("paintings",p)) or instagram_post_caption(p),
-             "status":(records.get(identity("paintings",p)) or {}).get("status","queue")}
+             "status":(records.get(identity("paintings",p)) or {}).get("status","queue"),
+             "format":(records.get(identity("paintings",p)) or {}).get("format"),
+             "images":(prepared.get(identity("paintings",p)) or {}).get("images") or [],
+             "reel":(prepared.get(identity("paintings",p)) or {}).get("reel"),
+             "reel_style":(prepared.get(identity("paintings",p)) or {}).get("reel_style"),
+             "stories":(prepared.get(identity("paintings",p)) or {}).get("stories") or [],
+             "story_status":next((v.get("status") for v in (history.get("story_records") or {}).values()
+                                  if v.get("artwork_id")==identity("paintings",p)),"queue")}
             for p in artworks],
         "selected_fact_id":str((next_fact(facts,history) or {}).get("id") or ""),
     }
@@ -599,11 +606,13 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
         metrics = decode_metrics_file(metrics_document)
         status["metrics_last_checked"] = metrics.get("checked_at")
         status["metrics_posts"] = [
-            {"title": rec.get("title"), "external_link": rec.get("external_link"),
+            {"title": rec.get("title"), "format": rec.get("format"),
+             "external_link": rec.get("external_link"),
              "metrics": (metrics.get("posts") or {}).get(post_id, {}).get("metrics", {}),
              "metrics_updated_at": (metrics.get("posts") or {}).get(post_id, {}).get("metrics_updated_at"),
              "error": (metrics.get("posts") or {}).get(post_id, {}).get("error")}
-            for post_id, rec in (history.get("records") or {}).items()
+            for post_id, rec in [*((history.get("records") or {}).items()),
+                                 *((history.get("story_records") or {}).items())]
             if rec.get("status") in ("sent", "accepted")
         ]
     except Exception:
@@ -672,6 +681,12 @@ class InstagramSwitch(BaseModel):
     enabled: bool
 
 
+class InstagramSelectedPost(BaseModel):
+    kind: Literal["fact", "artwork", "story"]
+    id: str = Field(min_length=1, max_length=80)
+    format: Literal["carousel", "reel", "post", "story"]
+
+
 @app.post("/api/integrations/instagram/toggle")
 async def instagram_toggle(change: InstagramSwitch, x_telegram_init_data: str = Header(default="")):
     authenticate(x_telegram_init_data)
@@ -727,6 +742,30 @@ async def instagram_publish(x_telegram_init_data: str = Header(default="")):
     return result
 
 
+@app.post("/api/integrations/instagram/publish-selected")
+async def instagram_publish_selected(selection: InstagramSelectedPost,
+                                     x_telegram_init_data: str = Header(default="")):
+    authenticate(x_telegram_init_data)
+    if selection.kind == "fact" and (selection.format != "carousel" or not selection.id.isdigit()):
+        raise HTTPException(422, "Invalid fact selection")
+    if selection.kind in ("artwork", "story") and not re.fullmatch(r"[0-9a-f]{24}", selection.id):
+        raise HTTPException(422, "Invalid artwork selection")
+    if selection.kind == "artwork" and selection.format not in ("post", "carousel", "reel"):
+        raise HTTPException(422, "Invalid artwork format")
+    if selection.kind == "story" and selection.format != "story":
+        raise HTTPException(422, "Invalid Story format")
+    if selection.kind == "story":
+        result = await sync_instagram_story(read_file, update_file, identity,
+                                            manual=True, artwork_id=selection.id)
+    else:
+        result = await sync_instagram(read_file, update_file, identity, gh, manual=True,
+                                      selected_kind=selection.kind, selected_id=selection.id,
+                                      selected_format=selection.format)
+    if not result.get("ok"):
+        raise HTTPException(409, result.get("reason") or "Instagram publication needs review")
+    return result
+
+
 @app.post("/internal/instagram/stories")
 async def instagram_stories_sync(authorization: str = Header(default="")):
     if not authorization.startswith("Bearer "):
@@ -745,7 +784,7 @@ async def instagram_metrics_sync(authorization: str = Header(default="")):
         authorization[7:],
         workflow="DmiriiX/ivory-bot/.github/workflows/instagram-metrics.yml@refs/heads/main")
     history, _ = await read_file("paintings", "instagram_state.json")
-    records = history.get("records") or {}
+    records = {**(history.get("records") or {}), **(history.get("story_records") or {})}
     results = await collect_post_metrics(records)
     if results and not any("error" not in record for record in results.values()):
         # Preserve last successful snapshot if the experimental API is unavailable.

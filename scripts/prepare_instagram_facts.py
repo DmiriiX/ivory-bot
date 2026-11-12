@@ -73,8 +73,10 @@ def text(draw, xy, value, face, size, colour=IVORY, anchor="lt"):
 
 def tracked(draw, x, y, value, size, gap, colour=MUTED):
     face = fact_font(BODY_FONT, size)
+    # A common baseline keeps the dot and hyphen in the natural positions.
+    baseline = y - face.getbbox(value, anchor="ls")[1]
     for letter in value:
-        draw.text((x, y), letter, font=face, fill=colour, anchor="lt")
+        draw.text((x, baseline), letter, font=face, fill=colour, anchor="ls")
         x += face.getlength(letter) + gap
 
 
@@ -115,8 +117,8 @@ def cover(number, record):
     return image
 
 
-def body(page, label, layout):
-    image, draw = frame(page, label, 0.31)
+def body(page, number, layout):
+    image, draw = frame(page, f"ART FACTS   /   {number:02d}", 0.31)
     y = 282
     size = layout.font_size
     for paragraph in layout.paragraphs:
@@ -148,10 +150,10 @@ def render_carousel(fact, edit=None):
     russian = fact_text_pages(ru)
     images = [
         cover(number, FACTS[str(number)]),
-        body(2, "ENGLISH", english[0]),
-        body(3, "ENGLISH", english[1]),
-        body(4, "РУССКИЙ", russian[0]),
-        body(5, "РУССКИЙ", russian[1]),
+        body(2, number, english[0]),
+        body(3, number, english[1]),
+        body(4, number, russian[0]),
+        body(5, number, russian[1]),
         closing(number),
     ]
     names = fact_slide_names(fact, edit)
@@ -170,10 +172,9 @@ def main():
     overrides = json.loads((ROOT / "instagram_fact_slide_overrides.json").read_text(encoding="utf-8"))
     for key in FACTS:
         fact = {"id": key}
-        if not all((OUT / name).is_file() for name in fact_slide_names(fact)):
-            render_carousel(fact)
+        render_carousel(fact)
         edit = overrides.get(key)
-        if edit and not all((OUT / name).is_file() for name in fact_slide_names(fact, edit)):
+        if edit:
             render_carousel(fact, edit)
 
 
