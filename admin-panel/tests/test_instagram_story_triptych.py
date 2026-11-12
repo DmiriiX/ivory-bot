@@ -83,6 +83,7 @@ class StoryTriptychTests(unittest.TestCase):
 
     def test_selected_story_can_be_sent_outside_scheduled_window(self):
         state,read_file,update_file=self.mock_backend()
+        state["records"]={}
         sender=AsyncMock(side_effect=[{"id":str(i),"status":"sending"} for i in range(3)])
         async def run():
             with patch.object(instagram,"due_now",return_value=False), \

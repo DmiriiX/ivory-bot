@@ -411,10 +411,10 @@ function renderEditorial(){
   if(p.stories?.length===3){const card=document.createElement("article");card.className="post";
    const img=document.createElement("img");img.src=p.stories[0];img.alt="Story · "+p.title;img.loading="lazy";card.append(img);
    const body=document.createElement("div");body.className="body";const heading=document.createElement("b");heading.textContent="Story · "+p.title;body.append(heading);
-   const info=document.createElement("small");info.textContent=p.story_status==="queue"?"3 кадра · после публикации картины в ленте":p.story_status;body.append(info);
+   const info=document.createElement("small");info.textContent=p.story_status==="queue"?"3 кадра · готово к отправке":p.story_status;body.append(info);
    const gallery=document.createElement("div");gallery.className="ig-gallery";for(const url of p.stories){const photo=document.createElement("img");photo.src=url;photo.alt="Кадр Story";photo.loading="lazy";gallery.append(photo)}body.append(gallery);
    const actions=document.createElement("div");actions.className="actions";
-   const send=button("Отправить Story сейчас",()=>sendSelected("story",p.id,"story",p.title,send));send.disabled=p.status!=="sent"||p.story_status!=="queue";actions.append(send);
+   const send=button("Отправить Story сейчас",()=>sendSelected("story",p.id,"story",p.title,send));send.disabled=p.story_status!=="queue";actions.append(send);
    body.append(actions);card.append(body);stories.append(card)
   }
  }

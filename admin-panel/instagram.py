@@ -624,9 +624,6 @@ async def sync_instagram_story(read_file, update_file, identity, manual=False, a
     if artwork_id and existing_artworks and artwork_id not in existing_artworks:
         return {"ok": False, "reason": "A different Story series is already reserved today"}
     if artwork_id and not existing_artworks:
-        published = state.get("records") or {}
-        if (published.get(artwork_id) or {}).get("status") != "sent":
-            return {"ok": False, "reason": "Publish the artwork to the Instagram feed before its Story"}
         if artwork_id in {v.get("artwork_id") for v in records.values()}:
             return {"ok": False, "reason": "Story for this artwork has already been used"}
         selected = artwork_id
