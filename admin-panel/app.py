@@ -395,13 +395,18 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
     history, _ = await read_file("paintings","instagram_state.json")
     facts,_ = await read_file("facts","posts.json")
     artworks,_ = await read_file("paintings","posts.json")
+    try:
+        prepared,_=await read_file("paintings","instagram_assets.json")
+        prepared=(prepared.get("artworks") or {}) if history.get("rich_media_enabled") else {}
+    except HTTPException:
+        prepared={}
     records=history.get("records") or {}
     exclusions=set(str(i) for i in history.get("ig_fact_excluded",[]))
     overrides=history.get("ig_fact_captions") or {}
     return {
         "facts_enabled":bool(history.get("ig_facts_enabled",False)),
         "next_kind":cycle_next_kind(history) if history.get("ig_facts_enabled") else "artwork",
-        "calendar":feed_calendar(history,facts),
+        "calendar":feed_calendar(history,facts,artworks=artworks,media=prepared),
         "facts":[
             {"id":str(f["id"]),"title":f.get("title"),"photo":fact_media(f),
              "caption":overrides.get(str(f["id"])) or fact_caption(f),

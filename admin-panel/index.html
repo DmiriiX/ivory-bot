@@ -295,11 +295,18 @@ function renderEditorial(){
  const calendar=$("igfacts-calendar");calendar.replaceChildren();
  for(const item of d.calendar||[]){
   const r=document.createElement("div");r.className="between";r.style.cssText="border-top:1px solid var(--line);padding:12px 0;gap:12px";
-  const label=document.createElement("div");
-  const title=document.createElement("b");title.textContent=(item.kind==="fact"?"Факт":item.format==="reel"?"Reel":"Карусель")+" · "+item.title;
-  const when=document.createElement("small");when.style.display="block";when.textContent=date(item.at)+" МСК · план";
-  label.append(title,when);r.append(label);
-  if(item.kind==="fact"&&item.id){const btn=button("Открыть текст",()=>{const p=d.facts.find(x=>x.id===item.id);if(p)editorialEdit("fact",p)});r.append(btn)}
+  const left=document.createElement("div");left.style.cssText="display:flex;align-items:center;gap:12px;min-width:0;flex:1";
+  if(item.photo){const img=document.createElement("img");img.src=item.photo;img.alt="Фото запланированной публикации";img.loading="lazy";img.referrerPolicy="no-referrer";img.style.cssText="width:52px;height:64px;object-fit:contain;background:#29251f;border:1px solid var(--line)";left.append(img)}
+  const label=document.createElement("div");label.style.minWidth="0";
+  const title=document.createElement("b");title.textContent=(item.kind==="fact"?"Факт":item.format==="reel"?"Reel":item.format==="carousel"?"Карусель":"Пост")+" · "+item.title;
+  const when=document.createElement("small");when.style.display="block";when.textContent=date(item.at)+" МСК · предварительный план";
+  label.append(title,when);left.append(label);r.append(left);
+  if(item.id){
+   const btn=button("Текст / изменить",()=>{
+    const p=item.kind==="fact"?d.facts.find(x=>x.id===item.id):d.artworks.find(x=>x.id===item.id);
+    if(p)editorialEdit(item.kind==="fact"?"fact":"artwork",p)
+   });r.append(btn)
+  }
   calendar.append(r);
  }
  text($("igfacts-total"),d.facts.length+" тем, с №1");
