@@ -394,6 +394,7 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
     authenticate(x_telegram_init_data)
     history, _ = await read_file("paintings","instagram_state.json")
     facts,_ = await read_file("facts","posts.json")
+    slide_overrides,_ = await read_file("paintings","instagram_fact_slide_overrides.json")
     artworks,_ = await read_file("paintings","posts.json")
     try:
         prepared,_=await read_file("paintings","instagram_assets.json")
@@ -409,8 +410,11 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
         "calendar":feed_calendar(history,facts,artworks=artworks,media=prepared),
         "facts":[
             {"id":str(f["id"]),"title":f.get("title"),"photo":fact_media(f),
-             "caption":overrides.get(str(f["id"])) or fact_caption(f),
-             "slides":fact_slides(f),"format":"carousel",
+             "caption":overrides.get(str(f["id"])) or fact_caption(f,slide_overrides.get(str(f["id"]))),
+             "slides":fact_slides(f,slide_overrides.get(str(f["id"]))),"format":"carousel",
+             "slide_en":(slide_overrides.get(str(f["id"])) or {}).get("en") or FACTS[str(f["id"])]["en"],
+             "slide_ru":(slide_overrides.get(str(f["id"])) or {}).get("ru") or FACTS[str(f["id"])]["ru"],
+             "slides_edited":str(f["id"]) in slide_overrides,
              "excluded":str(f["id"]) in exclusions,
              "status":(records.get(fact_key(f)) or {}).get("status","queue")}
             for f in facts if int(f.get("id",0)) in FACTS],
@@ -473,6 +477,37 @@ async def instagram_editorial_caption(data:InstagramEditorialEdit,
     await update_file("paintings","instagram_state.json",history,sha,
                       "Admin: update Instagram-only "+data.kind+" draft [skip ci]")
     return {"ok":True,"kind":data.kind,"id":data.id}
+
+
+class InstagramFactSlideEdit(BaseModel):
+    id: int = Field(ge=1,le=15)
+    en: str = Field(min_length=20,max_length=360)
+    ru: str = Field(min_length=20,max_length=360)
+
+
+@app.post("/api/integrations/instagram/editorial/slides")
+async def instagram_editorial_slides(data:InstagramFactSlideEdit,
+                                    x_telegram_init_data:str=Header(default="")):
+    """Edit EN/RU slide copy before sending; GitHub regenerates versioned JPEGs.
+
+    Published or reserved facts cannot be changed retroactively.
+    Edited asset URLs are new and publication blocks until ALL 4 are live.
+    """
+    authenticate(x_telegram_init_data)
+    history,_=await read_file("paintings","instagram_state.json")
+    key=fact_key({"id":data.id})
+    if key in (history.get("records") or {}):
+        raise HTTPException(409,"Fact reserved or published; cannot change image slides")
+    en,ru=data.en.strip(),data.ru.strip()
+    if not en or not ru:
+        raise HTTPException(422,"Two readable language versions required")
+    revision=hashlib.sha256((en+"\\0"+ru).encode("utf-8")).hexdigest()[:12]
+    edits,sha=await read_file("paintings","instagram_fact_slide_overrides.json")
+    edits[str(data.id)]={"en":en,"ru":ru,"revision":revision}
+    await update_file("paintings","instagram_fact_slide_overrides.json",edits,sha,
+                      "Admin: regenerate versioned bilingual Instagram Fact carousel slides")
+    return {"ok":True,"id":data.id,"revision":revision,
+            "note":"Four edited slides will be generated in GitHub; publishing requires all 4 images"}
 
 
 @app.post("/api/integrations/instagram/editorial/exclude")
