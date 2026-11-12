@@ -20,10 +20,14 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
 from instagram_gallery import discover_gallery, format_for_gallery
-from instagram_facts import FACTS, fact_caption, fact_key, fact_media, fact_slides, next_fact, feed_calendar, cycle_next_kind
+from instagram_facts import (
+    FACTS, MAX_FACT_CAPTION_LENGTH, fact_caption, fact_key, fact_slide_text,
+    fact_slides, next_fact, feed_calendar, cycle_next_kind,
+)
+from instagram_fact_layout import MAX_SLIDE_TEXT_LENGTH, fact_text_pages
 from instagram_editorial import make_editorial_reel
 from schedule_info import next_post, next_instagram_check, next_instagram_publication, next_instagram_story
-from instagram import post_caption as instagram_post_caption, inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story
+from instagram import post_caption as instagram_post_caption, inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story, unavailable_fact_slide
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -404,20 +408,26 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
     records=history.get("records") or {}
     exclusions=set(str(i) for i in history.get("ig_fact_excluded",[]))
     overrides=history.get("ig_fact_captions") or {}
+    drafts = []
+    for fact in facts:
+        fact_id = str(fact["id"])
+        if fact_id not in FACTS:
+            continue
+        edit = slide_overrides.get(fact_id)
+        slides = fact_slides(fact, edit)
+        en, ru = fact_slide_text(fact, edit)
+        drafts.append({
+            "id": fact_id, "title": FACTS[fact_id]["ru_title"], "photo": slides[0],
+            "caption": overrides.get(fact_id) or fact_caption(fact, edit),
+            "slides": slides, "format": "carousel", "slide_en": en, "slide_ru": ru,
+            "slides_edited": fact_id in slide_overrides, "excluded": fact_id in exclusions,
+            "status": (records.get(fact_key(fact)) or {}).get("status", "queue"),
+        })
     return {
         "facts_enabled":bool(history.get("ig_facts_enabled",False)),
         "next_kind":cycle_next_kind(history) if history.get("ig_facts_enabled") else "artwork",
         "calendar":feed_calendar(history,facts,artworks=artworks,media=prepared),
-        "facts":[
-            {"id":str(f["id"]),"title":f.get("title"),"photo":fact_media(f),
-             "caption":overrides.get(str(f["id"])) or fact_caption(f,slide_overrides.get(str(f["id"]))),
-             "slides":fact_slides(f,slide_overrides.get(str(f["id"]))),"format":"carousel",
-             "slide_en":(slide_overrides.get(str(f["id"])) or {}).get("en") or FACTS[str(f["id"])]["en"],
-             "slide_ru":(slide_overrides.get(str(f["id"])) or {}).get("ru") or FACTS[str(f["id"])]["ru"],
-             "slides_edited":str(f["id"]) in slide_overrides,
-             "excluded":str(f["id"]) in exclusions,
-             "status":(records.get(fact_key(f)) or {}).get("status","queue")}
-            for f in facts if int(f.get("id",0)) in FACTS],
+        "facts": drafts,
         "artworks":[
             {"id":identity("paintings",p),"title":p.get("title"),"artist":p.get("artist"),
              "photo":p.get("photo"),"caption":(history.get("ig_artwork_captions") or {}).get(identity("paintings",p)) or instagram_post_caption(p),
@@ -437,14 +447,10 @@ async def instagram_editorial_toggle(data:InstagramEditorialSwitch,
         first=next_fact(facts,history)
         if not first:
             raise HTTPException(409,"No available Instagram facts")
-        # Confirm the next fact card exists before enabling scheduled publication.
-        async with httpx.AsyncClient(timeout=15,follow_redirects=True) as client:
-            try:
-                result=await client.head(fact_media(first))
-                if result.status_code!=200 or not result.headers.get("content-type","").startswith("image/"):
-                    raise HTTPException(409,"Instagram Fact image not yet prepared")
-            except httpx.HTTPError as exc:
-                raise HTTPException(409,"Instagram Fact media inaccessible") from exc
+        edits, _ = await read_file("paintings", "instagram_fact_slide_overrides.json")
+        missing = await unavailable_fact_slide(fact_slides(first, edits.get(str(first["id"]))))
+        if missing is not None:
+            raise HTTPException(409, f"Слайд {missing} следующего факта ещё готовится")
     if any(v.get("status") in ("uncertain","accepted") for v in (history.get("records") or {}).values()):
         raise HTTPException(409,"Finish pending Instagram delivery first")
     history["ig_facts_enabled"]=data.enabled
@@ -465,6 +471,8 @@ async def instagram_editorial_caption(data:InstagramEditorialEdit,
             raise HTTPException(404,"Unknown fact")
         if fact_key({"id":data.id}) in records:
             raise HTTPException(409,"This fact is reserved or already published; cannot edit")
+        if len(data.caption.strip()) > MAX_FACT_CAPTION_LENGTH:
+            raise HTTPException(422, f"Подпись может содержать до {MAX_FACT_CAPTION_LENGTH} символов")
         target="ig_fact_captions"
     else:
         posts,_=await read_file("paintings","posts.json")
@@ -481,8 +489,8 @@ async def instagram_editorial_caption(data:InstagramEditorialEdit,
 
 class InstagramFactSlideEdit(BaseModel):
     id: int = Field(ge=1,le=15)
-    en: str = Field(min_length=20,max_length=280)
-    ru: str = Field(min_length=20,max_length=280)
+    en: str = Field(min_length=20, max_length=MAX_SLIDE_TEXT_LENGTH)
+    ru: str = Field(min_length=20, max_length=MAX_SLIDE_TEXT_LENGTH)
 
 
 @app.post("/api/integrations/instagram/editorial/slides")
@@ -491,7 +499,7 @@ async def instagram_editorial_slides(data:InstagramFactSlideEdit,
     """Edit EN/RU slide copy before sending; GitHub regenerates versioned JPEGs.
 
     Published or reserved facts cannot be changed retroactively.
-    Edited asset URLs are new and publication blocks until ALL 4 are live.
+    Each revision becomes publishable once all six slides are available.
     """
     authenticate(x_telegram_init_data)
     history,_=await read_file("paintings","instagram_state.json")
@@ -499,15 +507,20 @@ async def instagram_editorial_slides(data:InstagramFactSlideEdit,
     if key in (history.get("records") or {}):
         raise HTTPException(409,"Fact reserved or published; cannot change image slides")
     en,ru=data.en.strip(),data.ru.strip()
-    if not en or not ru:
-        raise HTTPException(422,"Two readable language versions required")
+    try:
+        fact_text_pages(en)
+        fact_text_pages(ru)
+    except ValueError as exc:
+        raise HTTPException(422, "Текст должен помещаться на двух слайдах для каждого языка") from exc
+    if len(fact_caption({"id": data.id}, {"en": en, "ru": ru})) > MAX_FACT_CAPTION_LENGTH:
+        raise HTTPException(422, f"Общий текст подписи должен быть до {MAX_FACT_CAPTION_LENGTH} символов")
     revision=hashlib.sha256((en+"\\0"+ru).encode("utf-8")).hexdigest()[:12]
     edits,sha=await read_file("paintings","instagram_fact_slide_overrides.json")
     edits[str(data.id)]={"en":en,"ru":ru,"revision":revision}
     await update_file("paintings","instagram_fact_slide_overrides.json",edits,sha,
                       "Admin: regenerate versioned bilingual Instagram Fact carousel slides")
     return {"ok":True,"id":data.id,"revision":revision,
-            "note":"Four edited slides will be generated in GitHub; publishing requires all 4 images"}
+            "note":"Готовится новая версия из шести слайдов"}
 
 
 @app.post("/api/integrations/instagram/editorial/exclude")

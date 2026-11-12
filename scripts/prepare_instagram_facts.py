@@ -1,127 +1,181 @@
 #!/usr/bin/env python3
-"""Render fully original, legible 4-card Instagram Facts carousels (1080x1350).
-
-Each carousel: editorial cover, English explanation, Russian explanation,
-quiet site CTA. All text sourced from independently curated FACTS.
-This script NEVER publishes to Instagram or Buffer.
-"""
-import sys
+"""Render the six-card Instagram Facts series and its editorial revisions."""
 import json
-import re
+import math
+import random
+import sys
+from functools import lru_cache
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
 
-ROOT=Path(__file__).resolve().parents[1]
-sys.path.insert(0,str(ROOT/"admin-panel"))
-from instagram_facts import FACTS
+from PIL import Image, ImageChops, ImageDraw
 
-OUT=ROOT/"instagram-media"/"facts"
-OUT.mkdir(parents=True,exist_ok=True)
-W,H=1080,1350
-BG="#0d0d0c"
-IVORY="#f2e3bc"
-MUTED="#d0c4ab"
-GOLD="#ad9669"
-BORDER="#5e5038"
-FONTPATH=Path("/usr/share/fonts/truetype/dejavu")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "admin-panel"))
 
-def font(size,serif=False):
-    return ImageFont.truetype(str(FONTPATH/("DejaVuSerif.ttf" if serif else "DejaVuSans.ttf")),size)
+from instagram_fact_layout import BODY_FONT, PARAGRAPH_GAP, fact_font, fact_text_pages, line_height
+from instagram_facts import FACTS, FACT_SLIDE_COUNT, fact_slide_names, fact_slide_text
 
-def layout_text(draw,body,max_size,max_width,max_height,limit=18):
-    """Fit natural language on screen, never clip or silently truncate."""
-    for size in range(max_size,limit-1,-2):
-        ft=font(size)
-        words=body.split()
-        lines=[]; row=""
-        for word in words:
-            proposed=(row+" "+word).strip()
-            if row and draw.textbbox((0,0),proposed,font=ft)[2]>max_width:
-                lines.append(row)
-                row=word
-            else:row=proposed
-        if row:lines.append(row)
-        line_height=int(size*1.58)
-        if len(lines)*line_height<=max_height:
-            return ft,lines,line_height
-    raise ValueError("Fact text too long to remain legible")
+OUT = ROOT / "instagram-media" / "facts"
+W, H = 1080, 1350
+LEFT, RIGHT = 90, 990
+IVORY = "#f2e3bc"
+PAPER = "#f3ead7"
+GOLD = "#cbb17e"
+ACCENT = "#e7c98d"
+MUTED = "#b7a894"
+RULE = "#514635"
+SERIF = "CormorantGaramond-Medium.otf"
+ITALIC = "CormorantGaramond-Italic.otf"
+LOGO = "Cinzel.ttf"
 
-def card_base(number,slide,language=None):
-    im=Image.new("RGB",(W,H),BG)
-    d=ImageDraw.Draw(im)
-    d.rectangle((69,94,73,192),fill=IVORY)
-    d.text((97,90),"IVORY ART",font=font(57,True),fill=IVORY)
-    d.text((97,167),"G A L L E R Y",font=font(18),fill=MUTED)
-    d.text((868,127),f"{slide:02d} / 04",font=font(25),fill=GOLD)
-    d.line((80,244,998,244),fill=BORDER,width=2)
-    d.text((82,317),"ART  /  FACTS",font=font(28),fill=GOLD)
-    d.text((82,389),f"№ {number:02d}",font=font(26,True),fill=MUTED)
-    if language:d.text((862,389),language,font=font(24),fill=MUTED)
-    d.line((82,1160,998,1160),fill=BORDER,width=2)
-    d.text((82,1205),"ORIGINAL ART  ·  IVORY-ART.COM",font=font(25),fill=IVORY)
-    return im,d
 
-def write_paragraph(draw,text,x,y,size,max_width,max_height,colour=IVORY):
-    ft,lines,line_height=layout_text(draw,text,size,max_width,max_height)
-    for line in lines:
-        draw.text((x,y),line,font=ft,fill=colour)
-        y+=line_height
-    return y
+@lru_cache(maxsize=3)
+def backdrop(strength):
+    """Warm light and fine contours shared across the carousel."""
+    width, height = 270, 338
+    pixels = []
+    for y in range(height):
+        for x in range(width):
+            xx, yy = x * 4, y * 4
+            light = strength * math.exp(-(((xx - 960) / 510) ** 2 + ((yy - 580) / 630) ** 2))
+            shade = 2.3 * math.exp(-(((xx - 180) / 800) ** 2 + ((yy - 320) / 1000) ** 2))
+            pixels.append(tuple(round(base + shade + tone * light)
+                                for base, tone in ((14, 12), (13, 8), (12, 4))))
+    base = Image.new("RGB", (width, height))
+    base.putdata(pixels)
+    base = base.resize((W, H), Image.Resampling.BICUBIC)
+    noise = Image.frombytes("L", (W, H), random.Random(11).randbytes(W * H))
+    noise = noise.point(lambda value: 128 + (value - 128) * 0.022).convert("RGB")
+    base = ImageChops.add(base, noise, offset=-128)
 
-def render_cover(number,record):
-    im,d=card_base(number,1)
-    # Minimal abstract ornament: geometrical lines, never imitation artwork.
-    for i in range(24):
-        d.arc((655-i*10, -90+i*19, 1535-i*9, 790+i*17),
-              start=28,end=162,fill=(49+i//4,43+i//5,31+i//6),width=2)
-    d.text((82,488),f"{number:02d}",font=font(121,True),fill="#6a593e")
-    write_paragraph(d,record["en_title"].upper(),82,704,57,915,270)
-    d.line((82,943,232,943),fill=GOLD,width=3)
-    write_paragraph(d,record["ru_title"],82,995,37,915,120,MUTED)
-    return im
+    lines = Image.new("RGBA", base.size)
+    draw = ImageDraw.Draw(lines)
+    for index in range(23):
+        radius = 272 + index * 17
+        points = []
+        for step in range(161):
+            angle = 0.52 + 1.9 * step / 160
+            x = 1110 + radius * math.cos(angle)
+            y = 265 + radius * 1.16 * math.sin(angle) + (x - 1110) * 0.29
+            points.append((x, y))
+        alpha = int(strength * (18 + 39 * math.sin(math.pi * (index + 1) / 24)))
+        draw.line(points, fill=(182, 143, 88, alpha), width=2 if index % 5 == 0 else 1)
+    return Image.alpha_composite(base.convert("RGBA"), lines).convert("RGB")
 
-def render_text(number,record,english):
-    slide=2 if english else 3
-    im,d=card_base(number,slide,"EN" if english else "RU")
-    title=record["en_title"] if english else record["ru_title"]
-    body=record["en"] if english else record["ru"]
-    write_paragraph(d,title,82,475,49,910,150)
-    d.line((82,662,225,662),fill=GOLD,width=3)
-    write_paragraph(d,body,82,742,43,900,410,IVORY)
-    return im
 
-def render_final(number,record):
-    im,d=card_base(number,4)
-    d.text((82,507),"ART IS WORTH",font=font(58,True),fill=IVORY)
-    d.text((82,607),"EXPLORING.",font=font(58,True),fill=IVORY)
-    d.line((82,746,242,746),fill=GOLD,width=3)
-    write_paragraph(d,"Искусство, к которому хочется возвращаться.",82,821,35,895,190,MUTED)
-    d.rectangle((82,1029,998,1116),outline=GOLD,width=2)
-    d.text((121,1053),"IVORY-ART.COM",font=font(36),fill=IVORY)
-    return im
+def text(draw, xy, value, face, size, colour=IVORY, anchor="lt"):
+    font = fact_font(face, size)
+    x1, y1, x2, y2 = draw.textbbox(xy, value, font=font, anchor=anchor)
+    if not (LEFT - 5 <= x1 <= x2 <= RIGHT + 2 and 0 <= y1 <= y2 <= H):
+        raise ValueError(f"Text is outside the carousel margins: {value!r}")
+    draw.text(xy, value, font=font, fill=colour, anchor=anchor)
 
-def save(im,path):
-    im.save(path,"JPEG",quality=93,optimize=True,subsampling=0)
-    with Image.open(path) as check:
-        assert check.size==(W,H)
-    print("GENERATED",path.relative_to(ROOT),path.stat().st_size)
 
-overrides=json.loads((ROOT/"instagram_fact_slide_overrides.json").read_text(encoding="utf-8"))
-for raw_id,record in FACTS.items():
-    num=int(raw_id)
-    cards=[render_cover(num,record),render_text(num,record,True),
-           render_text(num,record,False),render_final(num,record)]
-    for slide,im in enumerate(cards,1):
-        save(im,OUT/f"fact-{num:02d}-{slide}.jpg")
-    # Keep the original cover URL for existing Mini App users.
-    save(cards[0],OUT/f"fact-{num:02d}.jpg")
-    revision=overrides.get(raw_id) or {}
-    if revision:
-        rev=revision.get("revision","")
-        if not re.fullmatch(r"[0-9a-f]{12}",rev):
-            raise ValueError("Invalid revision for fact "+raw_id)
-        edited=dict(record,en=revision["en"],ru=revision["ru"])
-        amended=[render_cover(num,edited),render_text(num,edited,True),
-                 render_text(num,edited,False),render_final(num,edited)]
-        for slide,im in enumerate(amended,1):
-            save(im,OUT/f"fact-{num:02d}-{slide}-{rev}.jpg")
+def tracked(draw, x, y, value, size, gap, colour=MUTED):
+    face = fact_font(BODY_FONT, size)
+    for letter in value:
+        draw.text((x, y), letter, font=face, fill=colour, anchor="lt")
+        x += face.getlength(letter) + gap
+
+
+def heading(draw, x, y, value, face, size, colour=IVORY):
+    for font_size in range(size, 29, -1):
+        start, _, end, _ = fact_font(face, font_size).getbbox(value, anchor="lt")
+        origin = max(x, LEFT - 4 - start)
+        if origin + end <= RIGHT:
+            text(draw, (origin, y), value, face, font_size, colour)
+            return
+    raise ValueError(f"Title does not fit the carousel: {value!r}")
+
+
+def frame(page, label, strength):
+    image = backdrop(strength).copy()
+    draw = ImageDraw.Draw(image)
+    text(draw, (LEFT, 83), "IVORY-ART", LOGO, 48)
+    tracked(draw, LEFT + 2, 141, "GALLERY", 17, 4)
+    text(draw, (RIGHT, 105), label, BODY_FONT, 24, GOLD, anchor="rt")
+    for y in (198, 1195):
+        draw.line((LEFT, y, RIGHT, y), fill=RULE, width=2)
+    text(draw, (RIGHT, 1230), f"{page} / {FACT_SLIDE_COUNT}", BODY_FONT, 24, MUTED, anchor="rt")
+    return image, draw
+
+
+def cover(number, record):
+    image, draw = frame(1, f"ART FACTS   /   {number:02d}", 1.0)
+    lines = record["en_title"]
+    positions = {1: (459,), 2: (390, 526), 3: (332, 476, 605)}
+    for i, (line, y) in enumerate(zip(lines, positions[len(lines)])):
+        if i == len(lines) - 1:
+            heading(draw, LEFT - 1, y, line, ITALIC, 190, ACCENT)
+        else:
+            heading(draw, LEFT, y, line, SERIF, 151)
+    draw.line((LEFT, 849, 228, 849), fill=GOLD, width=3)
+    heading(draw, LEFT, 908, record["ru_title"], SERIF, 66, PAPER)
+    tracked(draw, LEFT, 1230, "IVORY-ART.COM", 22, 1.7)
+    return image
+
+
+def body(page, label, layout):
+    image, draw = frame(page, label, 0.31)
+    y = 282
+    size = layout.font_size
+    for paragraph in layout.paragraphs:
+        for row in paragraph:
+            if y + fact_font(BODY_FONT, size).getbbox(row, anchor="ls")[3] >= 1180:
+                raise ValueError("Fact text reaches the carousel footer")
+            text(draw, (LEFT, y), row, BODY_FONT, size, PAPER, anchor="ls")
+            y += line_height(size)
+        y += PARAGRAPH_GAP
+    if layout.footer:
+        text(draw, (LEFT, 1230), layout.footer, BODY_FONT, 24, GOLD)
+    return image
+
+
+def closing(number):
+    image, draw = frame(FACT_SLIDE_COUNT, f"ART FACTS   /   {number:02d}", 0.76)
+    text(draw, (LEFT, 390), "Explore", SERIF, 139)
+    heading(draw, LEFT - 2, 524, "original paintings", ITALIC, 108, ACCENT)
+    draw.line((LEFT, 702, 228, 702), fill=GOLD, width=3)
+    text(draw, (LEFT, 772), "Смотреть картины", SERIF, 70, PAPER)
+    tracked(draw, LEFT, 992, "IVORY-ART.COM", 32, 3, IVORY)
+    return image
+
+
+def render_carousel(fact, edit=None):
+    number = int(fact["id"])
+    en, ru = fact_slide_text(fact, edit)
+    english = fact_text_pages(en)
+    russian = fact_text_pages(ru)
+    images = [
+        cover(number, FACTS[str(number)]),
+        body(2, "ENGLISH", english[0]),
+        body(3, "ENGLISH", english[1]),
+        body(4, "РУССКИЙ", russian[0]),
+        body(5, "РУССКИЙ", russian[1]),
+        closing(number),
+    ]
+    names = fact_slide_names(fact, edit)
+    for name, image in zip(names, images, strict=True):
+        path = OUT / name
+        image.save(path, "JPEG", quality=93, optimize=True, subsampling=0)
+        with Image.open(path) as check:
+            if check.size != (W, H):
+                raise ValueError(f"Unexpected dimensions: {path}")
+            check.verify()
+    print(f"Rendered fact {number:02d} · {len(names)} slides · {english[0].font_size}/{russian[0].font_size}px")
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    overrides = json.loads((ROOT / "instagram_fact_slide_overrides.json").read_text(encoding="utf-8"))
+    for key in FACTS:
+        fact = {"id": key}
+        if not all((OUT / name).is_file() for name in fact_slide_names(fact)):
+            render_carousel(fact)
+        edit = overrides.get(key)
+        if edit and not all((OUT / name).is_file() for name in fact_slide_names(fact, edit)):
+            render_carousel(fact, edit)
+
+
+if __name__ == "__main__":
+    main()

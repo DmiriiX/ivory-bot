@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from schedule_info import next_instagram_publication
 from instagram_campaign import due_now, feed_format
-from instagram_facts import next_fact, cycle_next_kind, fact_key, fact_caption, fact_media, fact_slides
+from instagram_facts import MAX_FACT_CAPTION_LENGTH, next_fact, cycle_next_kind, fact_key, fact_caption, fact_slides
 import base64
 from media import normalized_image
 from instagram_translations import TITLES, ARTISTS
@@ -269,6 +269,20 @@ async def prepared_media_ready(media, kind):
     return True
 
 
+async def unavailable_fact_slide(slides):
+    """Return the first slide without a public image, or None when all are ready."""
+    async with httpx.AsyncClient(timeout=18, follow_redirects=True) as client:
+        async def ready(url):
+            try:
+                response = await client.head(url)
+                return response.status_code == 200 and response.headers.get("content-type", "").startswith("image/")
+            except httpx.HTTPError:
+                return False
+
+        results = await asyncio.gather(*(ready(url) for url in slides))
+    return next((index for index, result in enumerate(results, 1) if not result), None)
+
+
 async def create_buffer_post(channel_id, post, image_url, media=None, kind='post'):
     url = post.get("photo", "")
     if not url.startswith("https://"):
@@ -282,14 +296,10 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
     }
     """
     if kind == "fact_carousel":
-        prefix = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/facts/"
         links = (media or {}).get("images") or []
-        identifier = str(post.get("fact_id") or "")
-        expected = post.get("fact_slide_urls") or []
-        if (not identifier.isdigit() or len(links) != 4 or links != expected
-                or not all(re.fullmatch(re.escape(prefix)+r"fact-"+identifier.zfill(2)
-                    +r"-[1-4](?:-[0-9a-f]{12})?\.jpg", u) for u in links)):
-            raise ValueError("Instagram Fact must have 4 verified editorial slides")
+        expected = fact_slides({"id": post.get("fact_id")}, {"revision": post.get("fact_slide_revision")})
+        if links != expected:
+            raise ValueError("Instagram Fact needs all six verified editorial slides in order")
         assets = [{"image": {"url": link}} for link in links]
         kind = "carousel"
     elif kind == "story":
@@ -394,7 +404,6 @@ async def sync_instagram(read_file, update_file, identity, github_api):
         if not fact:
             return {"ok": True, "reason": "Instagram facts queue exhausted; review before publishing artwork"}
         item_id = fact_key(fact)
-        image_url = fact_media(fact)
         try:
             edits, _ = await read_file("paintings", "instagram_fact_slide_overrides.json")
         except Exception:
@@ -402,18 +411,16 @@ async def sync_instagram(read_file, update_file, identity, github_api):
             return {"ok": False, "reason": "Fact slide editing state unavailable"}
         slide_edit = edits.get(str(fact["id"])) or {}
         slides = fact_slides(fact, slide_edit)
-        # Validate ALL four images before making a no-repeat reservation.
-        async with httpx.AsyncClient(timeout=18, follow_redirects=True) as client:
-            for index, slide_url in enumerate(slides, 1):
-                try:
-                    response = await client.head(slide_url)
-                    if response.status_code != 200 or not response.headers.get("content-type","").startswith("image/"):
-                        return {"ok": False, "reason": "Fact carousel slide "+str(index)+" not ready", "id": item_id}
-                except httpx.HTTPError:
-                    return {"ok": False, "reason": "Fact carousel slide "+str(index)+" unreachable", "id": item_id}
+        missing = await unavailable_fact_slide(slides)
+        if missing is not None:
+            return {"ok": False, "reason": f"Fact carousel slide {missing} not ready", "id": item_id}
         override = (state.get("ig_fact_captions") or {}).get(str(fact["id"]))
         text = override if isinstance(override,str) and override.strip() else fact_caption(fact, slide_edit)
-        prepared_post = {"photo":image_url, "title":fact.get("title"), "fact_id":fact["id"], "fact_slide_urls":slides, "instagram_caption":text}
+        if len(text) > MAX_FACT_CAPTION_LENGTH:
+            return {"ok": False, "reason": "Fact caption exceeds the Buffer limit", "id": item_id}
+        image_url = slides[0]
+        prepared_post = {"photo":image_url, "title":fact.get("title"), "fact_id":fact["id"],
+                         "fact_slide_revision":slide_edit.get("revision"), "instagram_caption":text}
         records[item_id] = {
             "title":fact.get("title"),"status":"uncertain","format":"carousel",
             "editorial_cycle":True,"kind":"fact","fact_id":fact["id"],
