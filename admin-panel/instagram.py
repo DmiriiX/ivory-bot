@@ -314,13 +314,15 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
     else:
         assets = [{"image": {"url": image_url}}]
         kind = "post"
+    # Buffer represents an Instagram carousel as a feed post with multiple assets.
+    buffer_type = "post" if kind == "carousel" else kind
     payload = {
         "text": "" if kind == "story" else (post.get("instagram_caption") or post_caption(post)),
         "channelId": channel_id,
         "schedulingType": "automatic",
         "mode": "shareNow",
         "assets": assets,
-        "metadata": {"instagram": {"type": kind, "shouldShareToFeed": kind != "story"}},
+        "metadata": {"instagram": {"type": buffer_type, "shouldShareToFeed": kind != "story"}},
     }
     data = await graphql(mutation, {"input": payload})
     result = data.get("createPost") or {}

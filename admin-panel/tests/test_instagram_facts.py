@@ -96,7 +96,7 @@ class FactsEditorialTests(unittest.TestCase):
                media={"images":slides},kind="fact_carousel")
     self.assertEqual(out["id"],"buffer-1")
     arg=call.call_args.args[1]["input"]
-    self.assertEqual(arg["metadata"]["instagram"]["type"],"carousel")
+    self.assertEqual(arg["metadata"]["instagram"]["type"],"post")
     self.assertEqual(len(arg["assets"]),6)
     self.assertEqual([x["image"]["url"] for x in arg["assets"]],slides)
     self.assertEqual(arg["text"],post["instagram_caption"])
