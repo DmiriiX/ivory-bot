@@ -1,171 +1,54 @@
-"""Editorial Instagram facts. Independent from Telegram/MAX posting history.
+"""Instagram Facts, with reviewed translations of the Telegram/MAX originals.
 
-Source themes: DmiriiX/ivory-bot-facts posts.json, IDs 1-15.
-All copy is editorially adapted rather than translated verbatim.
+The original Russian copy is from DmiriiX/ivory-bot-facts posts.json.
+Instagram publication history and editorial overrides are independent.
 """
-import re
 import hashlib
+import json
+import re
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
 from instagram_campaign import campaign_slot
 
-FACTS={
-  "1": {
-    "en_title": "Art That Lasts",
-    "ru_title": "Картина на века",
-    "en": "With thoughtful care, an oil painting can be enjoyed across generations. Stable conditions, careful handling and protection from direct sunlight matter far more than any promise of permanence.",
-    "ru": "При бережном отношении масляная картина может радовать несколько поколений. Важны стабильные условия, аккуратное обращение и защита от прямого солнца.",
-    "en_tags": "#artconservation #oilpainting #artcollecting",
-    "ru_tags": "#сохранениекартин #маслянаяживопись #коллекционирование"
-  },
-  "2": {
-    "en_title": "Before Van Eyck",
-    "ru_title": "До ван Эйка",
-    "en": "Jan van Eyck perfected luminous oil-painting techniques, but he did not invent oil painting from scratch. Earlier evidence includes murals made with drying oils in Afghanistan.",
-    "ru": "Ян ван Эйк довёл работу масляными красками до удивительной выразительности, но не изобрёл её с нуля. Более ранние примеры использования масел обнаружены в росписях Афганистана.",
-    "en_tags": "#arthistory #oilpaintinghistory #oldmasters",
-    "ru_tags": "#историяискусства #историяживописи #старыемастера"
-  },
-  "3": {
-    "en_title": "The Price of Blue",
-    "ru_title": "Драгоценный синий",
-    "en": "Natural ultramarine was once made from lapis lazuli, a rare stone brought to Europe along long trade routes. Its intense blue made it one of the most prized pigments in Renaissance painting.",
-    "ru": "Натуральный ультрамарин получали из лазурита, который доставляли в Европу издалека. Его насыщенный синий был одним из самых ценных пигментов живописи Возрождения.",
-    "en_tags": "#ultramarine #artpigments #renaissanceart",
-    "ru_tags": "#ультрамарин #пигменты #ренессанс"
-  },
-  "4": {
-    "en_title": "A Tube Changed Art",
-    "ru_title": "Тюбик изменил живопись",
-    "en": "In 1841, John Goffe Rand patented a collapsible metal paint tube. Portable colours helped artists work outdoors more easily and capture changing light.",
-    "ru": "В 1841 году Джон Гофф Рэнд запатентовал металлический тюбик для красок. Удобная упаковка помогла художникам чаще работать на пленэре и ловить меняющийся свет.",
-    "en_tags": "#pleinairpainting #arthistory #artistmaterials",
-    "ru_tags": "#пленэр #историяискусства #материалыдляживописи"
-  },
-  "5": {
-    "en_title": "Why Oil Feels Alive",
-    "ru_title": "Почему масло так выразительно",
-    "en": "Oil paint dries slowly enough for an artist to blend edges, build transitions and work wet into wet. Those decisions shape the painting's sense of depth and light.",
-    "ru": "Масляная краска сохнет достаточно медленно, чтобы художник мог смягчать границы, смешивать оттенки и работать по сырому. Так рождаются глубина и тонкие переходы света.",
-    "en_tags": "#oilpaintingtechnique #brushwork #paintingprocess",
-    "ru_tags": "#маслянаяживопись #мазки #техникаживописи"
-  },
-  "6": {
-    "en_title": "Beneath the Surface",
-    "ru_title": "Под красочным слоем",
-    "en": "Infrared imaging and X-rays can reveal changes hidden beneath a finished painting. Sometimes they show an artist reconsidering the composition while working.",
-    "ru": "Инфракрасная съёмка и рентген иногда позволяют увидеть изменения под верхним красочным слоем. Так исследователи находят следы творческих решений художника.",
-    "en_tags": "#artrestoration #artresearch #paintingtechniques",
-    "ru_tags": "#реставрация #исследованиеживописи #секретыкартин"
-  },
-  "7": {
-    "en_title": "A Painting's Fine Cracks",
-    "ru_title": "Кракелюр",
-    "en": "Fine cracks in a paint layer are called craquelure. They can reflect age and materials, but new or worsening cracking may also signal a conservation problem.",
-    "ru": "Тонкую сетку трещинок на красочном слое называют кракелюром. Она бывает связана с возрастом и материалами, но новые трещины иногда указывают на проблему сохранности.",
-    "en_tags": "#craquelure #artconservation #paintings",
-    "ru_tags": "#кракелюр #реставрация #сохранениекартин"
-  },
-  "8": {
-    "en_title": "The Mona Lisa Smile",
-    "ru_title": "Улыбка Моны Лизы",
-    "en": "Leonardo used soft transitions known as sfumato around the Mona Lisa's face. Subtle changes of shadow help make her expression seem different each time we look.",
-    "ru": "Леонардо использовал мягкие переходы света и тени - сфумато. Благодаря им выражение лица Моны Лизы кажется изменчивым в зависимости от взгляда зрителя.",
-    "en_tags": "#leonardodavinci #sfumato #arthistory",
-    "ru_tags": "#леонардодавинчи #сфумато #историяискусства"
-  },
-  "9": {
-    "en_title": "Layers of Colour",
-    "ru_title": "Слои цвета",
-    "en": "An oil painting is often built in stages: sketch, underpainting, colour and final accents. Layering lets painters adjust depth, light and texture over time.",
-    "ru": "Масляная картина нередко рождается поэтапно: рисунок, подмалёвок, цвет и завершающие акценты. Слои позволяют постепенно уточнять свет, глубину и фактуру.",
-    "en_tags": "#oilpaintinglayers #paintingtechniques #fineart",
-    "ru_tags": "#подмалевок #слоивживописи #живопись"
-  },
-  "10": {
-    "en_title": "How to Keep Art Safe",
-    "ru_title": "Как беречь картину",
-    "en": "Direct sunlight, high humidity and abrupt temperature changes can damage paintings. A stable environment and thoughtful placement are simple but important steps.",
-    "ru": "Прямое солнце, высокая влажность и резкие перепады температуры способны повредить живопись. Стабильные условия и правильное размещение помогут сохранить картину.",
-    "en_tags": "#artcare #artconservation #artcollectors",
-    "ru_tags": "#уходзакартинами #сохранениеживописи #коллекционерам"
-  },
-  "11": {
-    "en_title": "Van Gogh's Texture",
-    "ru_title": "Фактура Ван Гога",
-    "en": "Van Gogh often used thick, visible strokes of paint - a technique called impasto. The raised surface makes movement and light part of the painting's physical presence.",
-    "ru": "Ван Гог часто писал густыми, заметными мазками - в технике импасто. Рельеф поверхности усиливает ощущение движения и света в самой живописи.",
-    "en_tags": "#vangogh #impasto #paintingtexture",
-    "ru_tags": "#вангог #импасто #фактураживописи"
-  },
-  "12": {
-    "en_title": "Academic Painting",
-    "ru_title": "Академическая школа",
-    "en": "St Petersburg's Academy of Arts helped shape a rigorous tradition of drawing, composition and painting. That foundation still informs many contemporary artists' skills.",
-    "ru": "Петербургская Академия художеств сформировала традицию серьёзной подготовки в рисунке, композиции и живописи. Эта школа и сегодня влияет на мастерство многих художников.",
-    "en_tags": "#academicart #russianart #arteducation",
-    "ru_tags": "#академическаяживопись #русскоеискусство #художественнаяшкола"
-  },
-  "13": {
-    "en_title": "Holding the Light",
-    "ru_title": "Поймать мгновение",
-    "en": "Painters work with something a camera cannot decide for them: which light, gesture or colour matters most. One composition can preserve an impression of a fleeting moment.",
-    "ru": "Художник выбирает, какой свет, жест или оттенок станет главным. Благодаря композиции мимолётное впечатление может остаться с нами надолго.",
-    "en_tags": "#paintingcomposition #artappreciation #fineart",
-    "ru_tags": "#композиция #искусствовдеталях #живопись"
-  },
-  "14": {
-    "en_title": "Pigeons and Paintings",
-    "ru_title": "Голуби различают стили",
-    "en": "In controlled studies, pigeons learned to distinguish images by some visual features associated with different painting styles. It is a curious example of visual learning, not proof they appreciate art as humans do.",
-    "ru": "В экспериментах голуби научились отличать изображения по некоторым визуальным признакам, связанным с живописными стилями. Это пример зрительного обучения, а не доказательство человеческого восприятия искусства.",
-    "en_tags": "#artandscience #visualperception #artfacts",
-    "ru_tags": "#искусствоинаука #восприятиеискусства #фактыобискусстве"
-  },
-  "15": {
-    "en_title": "Art Changes With Us",
-    "ru_title": "Новый взгляд на картину",
-    "en": "The painting stays the same, yet we notice different details as our experiences change. Returning to an original artwork can reveal something we missed before.",
-    "ru": "Картина остаётся прежней, но с опытом мы замечаем в ней новые детали. Возвращаясь к оригинальному произведению, можно увидеть то, что раньше ускользало.",
-    "en_tags": "#artappreciation #originalart #collectingart",
-    "ru_tags": "#восприятиеживописи #оригинальнаякартина #искусстводома"
-  }
-}
-
-IMAGE_PREFIX="https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/facts/"
+FACTS = json.loads(Path(__file__).with_name("instagram_fact_content.json").read_text(encoding="utf-8"))
+IMAGE_PREFIX = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/facts/"
+FACT_SLIDE_COUNT = 6
+MAX_FACT_CAPTION_LENGTH = 2196
 MSK=ZoneInfo("Europe/Moscow")
 
 def fact_key(fact):
     return "igfact:"+str(fact["id"])
 
-def fact_caption(fact, override=None):
-    entry=FACTS.get(str(fact["id"]))
+def fact_slide_text(fact, override=None):
+    entry = FACTS.get(str(fact["id"]))
     if not entry:
         raise ValueError("Unreviewed Instagram fact ID")
     override = override or {}
-    en = override.get("en") or entry["en"]
-    ru = override.get("ru") or entry["ru"]
-    return "\n\n".join((
-        "ART FACTS · "+entry["en_title"]+"\n"+en,
-        "ФАКТЫ ОБ ИСКУССТВЕ · "+entry["ru_title"]+"\n"+ru,
-        "#ivoryart #artfacts #arthistory #arteducation "+entry["en_tags"]+
-        "\n#фактыобискусстве #историяискусства #живопись "+entry["ru_tags"]
-    ))
+    return override.get("en") or entry["en"], override.get("ru") or entry["ru"]
+
+def fact_caption(fact, override=None):
+    en, ru = fact_slide_text(fact, override)
+    tags = FACTS[str(fact["id"])]["tags"]
+    return "\n\n".join((en, ru, " ".join(tags)))
 
 def fact_media(fact):
-    return IMAGE_PREFIX+"fact-"+str(fact["id"]).zfill(2)+".jpg"
+    return fact_slides(fact)[0]
 
-def fact_slides(fact, override=None):
-    """Four 4:5 slides; a revision is immutable until all JPGs are ready."""
-    key=str(fact["id"])
+def fact_slide_names(fact, override=None):
+    """The six cards are distinct from the media URLs used by older posts."""
+    key = str(fact["id"])
     if key not in FACTS:
         raise ValueError("Unreviewed fact")
-    revision=(override or {}).get("revision", "")
-    if revision and not re.fullmatch(r"[0-9a-f]{12}",revision):
+    revision = (override or {}).get("revision") or ""
+    if revision and not re.fullmatch(r"[0-9a-f]{12}", revision):
         raise ValueError("Invalid slide revision")
-    suffix="-"+revision if revision else ""
-    return [IMAGE_PREFIX+"fact-"+key.zfill(2)+"-"+str(n)+suffix+".jpg"
-            for n in range(1,5)]
+    suffix = f"-{revision}" if revision else ""
+    return [f"fact-{int(key):02d}-carousel-{n}{suffix}.jpg" for n in range(1, FACT_SLIDE_COUNT + 1)]
+
+def fact_slides(fact, override=None):
+    return [IMAGE_PREFIX + name for name in fact_slide_names(fact, override)]
 
 
 def cycle_records(state):

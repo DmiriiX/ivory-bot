@@ -1,3 +1,1 @@
-First render on main after campaign code tests pass; no Instagram publishing.
-
-Re-render all fifteen four-card carousels: cover, EN, RU, gallery CTA. No Instagram posts.
+Render the approved six-slide carousels with complete English and Russian copy for all 15 Instagram facts.

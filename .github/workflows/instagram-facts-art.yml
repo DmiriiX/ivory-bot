@@ -1,4 +1,4 @@
-name: Prepare 4-slide Instagram Facts carousels (no publishing)
+name: Prepare six-slide Instagram Facts carousels
 on:
   push:
     paths:
@@ -17,29 +17,50 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
       - name: Install graphic backend
         run: python3 -m pip install Pillow==11.3.0
-      - name: Render 15 four-slide editorial carousels
+      - name: Render fact carousels and edited versions
         run: python3 scripts/prepare_instagram_facts.py
       - name: Validate cards
         run: |
           python3 - <<'PY'
-          from PIL import Image
+          import json
+          import sys
           from pathlib import Path
-          cards=list(Path("instagram-media/facts").glob("fact-*.jpg"))
-          assert len(cards)>=75,len(cards)
+          from PIL import Image
+          sys.path.insert(0, "admin-panel")
+          from instagram_facts import FACTS, FACT_SLIDE_COUNT, fact_slide_names
+
+          overrides = json.loads(Path("instagram_fact_slide_overrides.json").read_text(encoding="utf-8"))
+          folder = Path("instagram-media/facts")
+          cards = []
+          for key in FACTS:
+              fact = {"id": key}
+              names = fact_slide_names(fact)
+              if key in overrides:
+                  names += fact_slide_names(fact, overrides[key])
+              cards.extend(folder / name for name in names)
+          assert len(set(cards)) >= len(FACTS) * FACT_SLIDE_COUNT
           for card in cards:
-              im=Image.open(card)
-              assert im.size==(1080,1350),card
-              assert card.stat().st_size>30000,card
-          print("Validated",len(cards),"files across 15 four-slide Instagram carousels")
+              with Image.open(card) as image:
+                  assert image.format == "JPEG" and image.size == (1080, 1350), card
+                  image.verify()
+          print(f"Validated {len(cards)} JPEGs across {len(FACTS)} fact carousels")
           PY
       - name: Store media without touching Instagram state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add instagram-media/facts/*.jpg
+          git add 'instagram-media/facts/fact-*-carousel-*.jpg'
           if ! git diff --cached --quiet; then
-            git commit -m "Prepare 15 four-slide Instagram Facts carousels [skip ci]"
-            git push origin HEAD:"${GITHUB_REF_NAME}"
+            git commit -m "Prepare Instagram Facts carousel images"
+            for attempt in 1 2 3; do
+              git pull --rebase origin "${GITHUB_REF_NAME}"
+              if git push origin HEAD:"${GITHUB_REF_NAME}"; then
+                exit 0
+              fi
+            done
+            exit 1
           fi
