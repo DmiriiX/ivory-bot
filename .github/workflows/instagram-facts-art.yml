@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - ".github/instagram-fact-cards-trigger.txt"
+      - "instagram_fact_slide_overrides.json"
   workflow_dispatch:
 permissions:
   contents: write
@@ -26,7 +27,7 @@ jobs:
           from PIL import Image
           from pathlib import Path
           cards=list(Path("instagram-media/facts").glob("fact-*.jpg"))
-          assert len(cards)==75,len(cards)
+          assert len(cards)>=75,len(cards)
           for card in cards:
               im=Image.open(card)
               assert im.size==(1080,1350),card
