@@ -224,7 +224,7 @@ def feed_calendar(state,facts,now=None,count=12,artworks=None,media=None):
         kind="fact" if state.get("ig_facts_enabled") and sequence%3==0 else "artwork"
         if kind=="fact":
             fact=next((f for f in facts if int(f["id"])==next_no),None) if next_no else None
-            item={"at":dt.isoformat(),"kind":"fact","format":"post",
+            item={"at":dt.isoformat(),"kind":"fact","format":"carousel",
                   "id":str(fact["id"]) if fact else None,
                   "title":fact["title"] if fact else "Очередь фактов закончилась",
                   "photo":fact_media(fact) if fact else None,
