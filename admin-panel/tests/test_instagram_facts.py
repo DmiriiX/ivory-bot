@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch,AsyncMock
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from instagram_facts import FACTS,fact_caption,fact_key,next_fact,cycle_next_kind,feed_calendar, fact_media
+from instagram_facts import FACTS,fact_caption,fact_key,next_fact,cycle_next_kind,feed_calendar, fact_media, fact_slides
 from instagram_campaign import MSK
 import instagram
 
@@ -63,6 +63,43 @@ class FactsEditorialTests(unittest.TestCase):
   self.assertEqual(plan[2]["title"],"Жаркое лето")
   self.assertEqual(plan[2]["format"],"reel")
   self.assertEqual(plan[2]["id"],artwork_key(artworks[1]))
+
+ def test_four_slides_are_in_correct_language_order(self):
+  urls=fact_slides({"id":1})
+  self.assertEqual(len(urls),4)
+  self.assertTrue(urls[0].endswith("fact-01-1.jpg"))
+  self.assertTrue(urls[1].endswith("fact-01-2.jpg"))
+  self.assertTrue(urls[2].endswith("fact-01-3.jpg"))
+  self.assertTrue(urls[3].endswith("fact-01-4.jpg"))
+  edited={"en":"Edited English detail", "ru":"Изменённая русская версия",
+          "revision":"012345abcdef"}
+  immutable=fact_slides({"id":1},edited)
+  self.assertEqual(len(immutable),4)
+  self.assertTrue(all(url.endswith("-012345abcdef.jpg") for url in immutable))
+  self.assertIn(edited["en"],fact_caption({"id":1},edited))
+  self.assertIn(edited["ru"],fact_caption({"id":1},edited))
+
+ def test_buffer_receives_four_images_not_single_cover(self):
+  import asyncio
+  async def run():
+   slides=fact_slides({"id":1})
+   post={"photo":fact_media({"id":1}),"title":"A fact","fact_id":1,
+         "fact_slide_urls":slides,"instagram_caption":"EN / RU #artfacts"}
+   result={"createPost":{"post":{"id":"buffer-1","status":"sending"}}}
+   with patch.object(instagram,"graphql",new=AsyncMock(return_value=result)) as call:
+    out=await instagram.create_buffer_post("channel",post,post["photo"],
+               media={"images":slides},kind="fact_carousel")
+    self.assertEqual(out["id"],"buffer-1")
+    arg=call.call_args.args[1]["input"]
+    self.assertEqual(arg["metadata"]["instagram"]["type"],"carousel")
+    self.assertEqual(len(arg["assets"]),4)
+    self.assertEqual([x["image"]["url"] for x in arg["assets"]],slides)
+    self.assertEqual(arg["text"],post["instagram_caption"])
+   with patch.object(instagram,"graphql",new=AsyncMock(return_value=result)):
+    with self.assertRaises(ValueError):
+     await instagram.create_buffer_post("channel",post,post["photo"],
+                      media={"images":slides[:1]},kind="fact_carousel")
+  asyncio.run(run())
 
  def test_editorial_caption_override_used_by_buffer(self):
   import asyncio
