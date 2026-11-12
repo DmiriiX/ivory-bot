@@ -39,7 +39,7 @@
     },
     "igfact:1": {
       "title": "Картина живёт столетиями",
-      "status": "accepted",
+      "status": "sent",
       "format": "carousel",
       "editorial_cycle": true,
       "kind": "fact",
@@ -48,7 +48,9 @@
       "campaign": true,
       "campaign_date": "2026-11-12",
       "buffer_post_id": "6af5e7357721c1913c5c71fb",
-      "buffer_status": "sending"
+      "buffer_status": "sending",
+      "external_link": "https://www.instagram.com/p/DfpeL4XGkl-/",
+      "checked_at": "2026-11-12T16:21:02.525614+00:00"
     }
   },
   "failed_attempts": [
