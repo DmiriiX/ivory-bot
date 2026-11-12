@@ -4,6 +4,7 @@ Source themes: DmiriiX/ivory-bot-facts posts.json, IDs 1-15.
 All copy is editorially adapted rather than translated verbatim.
 """
 import re
+import hashlib
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from instagram_campaign import campaign_slot
@@ -119,7 +120,7 @@ FACTS={
     "en": "In controlled studies, pigeons learned to distinguish images by some visual features associated with different painting styles. It is a curious example of visual learning, not proof they appreciate art as humans do.",
     "ru": "В экспериментах голуби научились отличать изображения по некоторым визуальным признакам, связанным с живописными стилями. Это пример зрительного обучения, а не доказательство человеческого восприятия искусства.",
     "en_tags": "#artandscience #visualperception #artfacts",
-    "ru_tags": "#искусствоинaука #восприятиеискусства #фактыобискусстве"
+    "ru_tags": "#искусствоинаука #восприятиеискусства #фактыобискусстве"
   },
   "15": {
     "en_title": "Art Changes With Us",
@@ -170,9 +171,17 @@ def next_fact(facts,state):
     eligible.sort(key=lambda p:int(p["id"]))
     return next((p for p in eligible if str(p["id"])==str(next_id)),None) or (eligible[0] if eligible else None)
 
-def feed_calendar(state,facts,now=None,count=12):
-    """Projected campaign feed dates; decisions are draft until Buffer confirms."""
-    from datetime import date
+def artwork_key(post):
+    value="painting:"+str(post.get("link") or post.get("title"))
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
+
+
+def feed_calendar(state,facts,now=None,count=12,artworks=None,media=None):
+    """Projected campaign feed slots, including draft artwork selection.
+
+    Fact IDs and predicted artworks are read-only suggestions: actual Buffer
+    submission still validates images, previous delivery and live controls.
+    """
     now=(now or datetime.now(MSK)).astimezone(MSK)
     campaign=state.get("campaign") or {}
     sequence=len(cycle_records(state))
@@ -180,6 +189,16 @@ def feed_calendar(state,facts,now=None,count=12):
     results=[]
     date_cursor=now
     existing_dates={v.get("campaign_date") for v in (state.get("records") or {}).values()}
+    artworks=artworks or []
+    media=media or {}
+    reserved=set((state.get("records") or {})) | set(state.get("baseline_ids") or [])
+    already_art=sum(v.get("campaign") is True and v.get("kind")!="fact"
+                    and v.get("status") in ("sent","accepted")
+                    for v in (state.get("records") or {}).values())
+    reel_count=sum(v.get("campaign") is True and v.get("kind")!="fact" and v.get("format")=="reel"
+                   and v.get("status") in ("sent","accepted")
+                   for v in (state.get("records") or {}).values())
+
     for _ in range(45):
         slot=campaign_slot(campaign,"feed",date_cursor)
         if not slot.get("next_at"):break
@@ -187,15 +206,51 @@ def feed_calendar(state,facts,now=None,count=12):
         date_cursor=dt+timedelta(minutes=91)
         if dt.date().isoformat() in existing_dates:continue
         kind="fact" if state.get("ig_facts_enabled") and sequence%3==0 else "artwork"
-        fmt=("fact" if kind=="fact" else "reel" if (sequence-sequence//3)%2==0 else "carousel")
-        fact=next((f for f in facts if int(f["id"])==next_no),None) if kind=="fact" and next_no else None
-        results.append({"at":dt.isoformat(),"kind":kind,"format":fmt,
-                        "id":str(fact["id"]) if fact else None,
-                        "title":fact["title"] if fact else ("Картина из очереди" if kind=="artwork" else "Очередь фактов закончилась"),
-                        "status":"planned"})
+        if kind=="fact":
+            fact=next((f for f in facts if int(f["id"])==next_no),None) if next_no else None
+            item={"at":dt.isoformat(),"kind":"fact","format":"post",
+                  "id":str(fact["id"]) if fact else None,
+                  "title":fact["title"] if fact else "Очередь фактов закончилась",
+                  "photo":fact_media(fact) if fact else None,
+                  "status":"planned"}
+            if fact:
+                remaining=[int(x["id"]) for x in facts if int(x["id"])>next_no
+                           and fact_key(x) not in (state.get("records") or {})
+                           and str(x["id"]) not in {str(i) for i in state.get("ig_fact_excluded",[])}]
+                next_no=min(remaining) if remaining else None
+        else:
+            desired=("reel","carousel","reel","carousel")[already_art%4]
+            candidates=[p for p in artworks if artwork_key(p) not in reserved]
+            if desired=="reel":
+                preferred_style=("cinematic","luxury")[reel_count%2]
+                artwork=next((p for p in candidates
+                              if media.get(artwork_key(p),{}).get("reel_style")==preferred_style
+                              and media.get(artwork_key(p),{}).get("reel")),None)
+                if artwork is None:
+                    artwork=next((p for p in candidates if media.get(artwork_key(p),{}).get("reel")),None)
+            else:
+                artwork=next((p for p in candidates if len(media.get(artwork_key(p),{}).get("images") or [])>=2),None)
+            if artwork is None:
+                artwork=candidates[0] if candidates else None
+            if artwork:
+                key=artwork_key(artwork)
+                prepared=media.get(key,{})
+                if desired=="reel" and prepared.get("reel"):
+                    actual="reel"
+                    reel_count+=1
+                elif len(prepared.get("images") or [])>=2:
+                    actual="carousel"
+                else:
+                    actual="post"
+                reserved.add(key)
+                item={"at":dt.isoformat(),"kind":"artwork","format":actual,"id":key,
+                      "title":artwork.get("title"),"artist":artwork.get("artist"),
+                      "photo":artwork.get("photo"),"status":"planned"}
+            else:
+                item={"at":dt.isoformat(),"kind":"artwork","format":"post","id":None,
+                      "title":"Работы в очереди закончились","status":"planned"}
+            already_art+=1
+        results.append(item)
         sequence+=1
-        if fact:
-            remaining=[int(x["id"]) for x in facts if int(x["id"])>next_no and fact_key(x) not in (state.get("records") or {}) and str(x["id"]) not in set(str(i) for i in state.get("ig_fact_excluded",[]))]
-            next_no=min(remaining) if remaining else None
         if len(results)>=count:break
     return results
