@@ -95,7 +95,7 @@ dialog::backdrop{background:#000b}
 <h1>Управление публикациями</h1><p>Картины и факты об искусстве · Telegram, MAX и Instagram</p>
 <nav class="tabs" aria-label="Разделы управления"><button class="active" data-kind="paintings" aria-selected="true">Картины</button><button data-kind="facts" aria-selected="false">Факты</button><button data-kind="instagram" aria-selected="false">Instagram</button><button data-kind="igfacts" aria-selected="false">Instagram · Факты</button></nav>
 <div id="error" role="alert"></div>
-<section id="instagram-section" hidden><div class="panel"><div class="between"><div><h2>Instagram · @ivoryartgallery</h2><small>Автоматическая публикация через Buffer</small></div><span id="instagram-status" class="status">Проверка</span></div><p id="instagram-details">Статус подключения загружается…</p><div class="next-time"><small>30 дней без рекламы · 9 ноября - 8 декабря</small><strong>4 поста в неделю: 2 Reels + 2 карусели</strong><small>Первый Reel сегодня, 9 ноября · 18:15 МСК. На первой неделе публикации 9, 12, 14 и 15 ноября, затем по вторникам, четвергам, субботам и воскресеньям.</small></div>
+<section id="instagram-section" hidden><div class="panel"><div class="between"><div><h2>Instagram · @ivoryartgallery</h2><small>Автоматическая публикация через Buffer</small></div><span id="instagram-status" class="status">Проверка</span></div><p id="instagram-details">Статус подключения загружается…</p><div class="next-time"><small>30 дней без рекламы · 9 ноября - 8 декабря</small><strong>4 публикации в неделю: факты, Reels и карусели</strong><small>Первый Reel сегодня, 9 ноября · 18:15 МСК. На первой неделе публикации 9, 12, 14 и 15 ноября, затем по вторникам, четвергам, субботам и воскресеньям.</small></div>
 <div class="next-time"><small>Следующая публикация Instagram · Москва</small><strong id="instagram-next">Загрузка…</strong><small>Фактическая доставка зависит от Buffer. Публикация не повторяется автоматически при неизвестном результате.</small></div>
 <div class="next-time"><small>Ближайшая Story · Москва</small><strong id="instagram-story-next">Загрузка…</strong><small>Понедельник, среда и пятница · 19:15 МСК. Серия из 3 Stories: картина, детали, переход на сайт. Без интерактивных стикеров.</small><small id="instagram-story-count">Истории: загрузка…</small></div><button id="instagram-toggle" disabled>Загрузка…</button><div class="next-time"><small>Контрольная точка восстановления</small><strong id="instagram-goal">Проверка прогресса…</strong><div style="height:8px;background:#383329;border:1px solid #544835;margin:10px 0 6px;overflow:hidden"><div id="instagram-goal-bar" style="width:0;height:100%;background:#f2e3bc;transition:width .3s"></div></div><small id="instagram-goal-details">Цель - 15 подтверждённых публикаций; затем сравним охваты, сохранения и подписки. Без платной рекламы.</small></div><div class="next-time"><small>Статистика Instagram · экспериментальные данные Buffer</small><strong id="instagram-metrics-updated">Нет данных</strong><div id="instagram-metrics-posts" style="margin-top:10px;display:grid;gap:10px"></div><small>Метрики обновляются Buffer примерно раз в сутки. Отсутствие значения не означает ноль. Показатели неподписчиков могут быть недоступны через API.</small></div><div class="tools"><button id="instagram-refresh" type="button">Обновить статистику</button></div></div>
 <div class="panel"><div class="between"><div><h2>Cinematic / Luxury Reels</h2><small>Чередование двух премиальных стилей, без отправки в Instagram</small></div><span class="status">Тестовый режим</span></div>
@@ -110,7 +110,7 @@ dialog::backdrop{background:#000b}
 <section id="igfacts-section" hidden>
 <div class="panel">
  <div class="between"><div><h2>Instagram · Факты об искусстве</h2><small>Независимая очередь: с факта №1, без учёта Telegram и MAX</small></div><span class="status" id="igfacts-status">Загрузка</span></div>
- <p>Цикл: <b>Факт → Картина → Картина</b>, затем следующий факт. Четыре публикации в ленте в неделю: общие слоты Instagram. Открывайте тексты и медиа перед публикацией, редактируйте только Instagram-версию.</p>
+ <p>Цикл: <b>Факт → Картина → Картина</b>. Каждый факт - карусель из четырёх слайдов: обложка, English, Русский, финал. Все материалы доступны для просмотра перед отправкой через Buffer.</p>
  <div class="next-time"><small>Следующий выпуск в ленте · МСК</small><strong id="igfacts-next">Загрузка…</strong><small id="igfacts-kind">Формат и произведение определяются по очереди и готовности медиа. План может измениться после отправки Buffer.</small></div>
  <button id="igfacts-toggle" disabled>Проверка…</button><button id="igfacts-refresh" type="button">Обновить</button>
  <small style="display:block;margin-top:10px">Включение фактов заменяет каждый третий слот картины; Telegram и MAX не затрагиваются. Публикация зависит от подтверждения Buffer.</small>
@@ -134,13 +134,22 @@ dialog::backdrop{background:#000b}
 <div class="filters"><button class="active" data-filter="queue">Ожидают</button><button data-filter="used">Использованы</button><button data-filter="excluded">Исключены</button><button data-filter="all">Все</button></div>
 <div id="list"><div class="placeholder">Загрузка записей…</div></div>
 </section>
+<dialog id="igfacts-slide-editor">
+<h2>Текст на слайдах факта</h2><p id="igfacts-slide-edit-title"></p>
+<label for="igfacts-slide-en">Слайд 2 - English</label>
+<textarea id="igfacts-slide-en" rows="5" maxlength="280" style="min-height:145px"></textarea>
+<label for="igfacts-slide-ru">Слайд 3 - Русский</label>
+<textarea id="igfacts-slide-ru" rows="5" maxlength="280" style="min-height:145px"></textarea>
+<small>Крупный шрифт сохранится автоматически. После сохранения GitHub пересоберёт четыре изображения. Если отдельно меняли подпись Instagram, проверьте её соответствие текстам слайдов.</small>
+<div class="tools"><button id="igfacts-slide-save" class="primary">Обновить слайды</button><button id="igfacts-slide-cancel">Отмена</button></div>
+</dialog>
 <dialog id="igfacts-editor"><h2>Текст для Instagram</h2><p id="igfacts-edit-title"></p><textarea id="igfacts-edit-text" rows="13" style="min-height:300px"></textarea><small>Английский блок первым, русский вторым. Хештеги внутри текста. Изменения действуют только на будущие публикации Instagram.</small><div class="tools"><button id="igfacts-save" class="primary">Сохранить</button><button id="igfacts-cancel">Отмена</button></div></dialog>
 <dialog id="editor"><h2>Редактировать текст</h2><p id="edit-title"></p><textarea id="edit-text"></textarea><div class="tools"><button id="save" class="primary">Сохранить</button><button id="cancel">Отмена</button></div></dialog>
 </main>
 <script>
 const tg=window.Telegram?.WebApp;tg?.ready();tg?.expand();
 const init=tg?.initData||"";const $=id=>document.getElementById(id);
-const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null,igFacts:null,igFactFilter:"queue",igFactEdit:null};
+const state={kind:"paintings",filter:"queue",data:null,edit:null,instagram:null,igFacts:null,igFactFilter:"queue",igFactEdit:null,igFactSlideEdit:null};
 function showSection(kind){
  $("instagram-section").hidden=kind!=="instagram";
  $("igfacts-section").hidden=kind!=="igfacts";
@@ -298,7 +307,7 @@ function renderEditorial(){
   const left=document.createElement("div");left.style.cssText="display:flex;align-items:center;gap:12px;min-width:0;flex:1";
   if(item.photo){const img=document.createElement("img");img.src=item.photo;img.alt="Фото запланированной публикации";img.loading="lazy";img.referrerPolicy="no-referrer";img.style.cssText="width:52px;height:64px;object-fit:contain;background:#29251f;border:1px solid var(--line)";left.append(img)}
   const label=document.createElement("div");label.style.minWidth="0";
-  const title=document.createElement("b");title.textContent=(item.kind==="fact"?"Факт":item.format==="reel"?"Reel":item.format==="carousel"?"Карусель":"Пост")+" · "+item.title;
+  const title=document.createElement("b");title.textContent=(item.kind==="fact"?"Карусель · Факт":item.format==="reel"?"Reel":item.format==="carousel"?"Карусель":"Пост")+" · "+item.title;
   const when=document.createElement("small");when.style.display="block";when.textContent=date(item.at)+" МСК · предварительный план";
   label.append(title,when);left.append(label);r.append(left);
   if(item.id){
@@ -320,8 +329,26 @@ function renderEditorial(){
   const heading=document.createElement("b");heading.textContent="Факт №"+p.id+" · "+p.title;body.append(heading);
   const note=document.createElement("small");note.textContent=p.excluded?"Исключён":p.status==="queue"?"Ожидает":p.status;body.append(note);
   const preview=document.createElement("div");preview.className="summary";preview.textContent=p.caption;body.append(preview);
+  if(p.slides?.length===4){
+   const hint=document.createElement("small");hint.style.cssText="display:block;margin-top:12px;color:var(--gold)";hint.textContent="Карусель · 4 слайда · 1080 × 1350 · нажмите фото для увеличения";body.append(hint);
+   const slides=document.createElement("div");slides.className="ig-gallery";
+   for(let i=0;i<p.slides.length;i++){
+    const link=document.createElement("a");link.href=p.slides[i];link.target="_blank";link.rel="noopener noreferrer";link.style.cssText="display:flex;flex-direction:column;align-items:start;gap:4px;flex-shrink:0";
+    const img=document.createElement("img");img.src=p.slides[i];img.alt="Слайд "+(i+1)+" из четырёх";img.loading="lazy";
+    const label=document.createElement("small");label.textContent=["01 · Обложка","02 · English","03 · Русский","04 · Галерея"][i];
+    link.append(img,label);slides.append(link);
+   }
+   body.append(slides);
+  }
   const actions=document.createElement("div");actions.className="actions";
-  actions.append(button("Полный текст / изменить",()=>editorialEdit("fact",p)));
+  actions.append(button("Подпись / изменить",()=>editorialEdit("fact",p)));
+  if(p.status==="queue")actions.append(button("Текст слайдов EN / RU",()=>{
+    state.igFactSlideEdit=p;
+    text($("igfacts-slide-edit-title"),"Факт №"+p.id+" · "+p.title);
+    $("igfacts-slide-en").value=p.slide_en||"";
+    $("igfacts-slide-ru").value=p.slide_ru||"";
+    $("igfacts-slide-editor").showModal();
+  }));
   if(p.status==="queue"){
    actions.append(button(p.excluded?"Вернуть":"Исключить",async()=>{try{await api("/api/integrations/instagram/editorial/exclude",{id:Number(p.id),excluded:!p.excluded});await loadEditorial()}catch(e){err(e.message)}}));
    if(!p.excluded)actions.append(button("Следующий",async()=>{try{await api("/api/integrations/instagram/editorial/next",{id:Number(p.id)});await loadEditorial()}catch(e){err(e.message)}}));
@@ -336,6 +363,21 @@ function renderEditorial(){
 }
 $("igfacts-refresh").onclick=loadEditorial;
 $("igfacts-cancel").onclick=()=>$("igfacts-editor").close();
+$("igfacts-slide-cancel").onclick=()=>$("igfacts-slide-editor").close();
+$("igfacts-slide-save").onclick=async()=>{
+ const p=state.igFactSlideEdit;if(!p)return;
+ const en=$("igfacts-slide-en").value.trim(),ru=$("igfacts-slide-ru").value.trim();
+ if(en.length<20||ru.length<20){err("Каждый язык: минимум 20 символов");return}
+ if(!confirm("Обновить текст двух слайдов? Генератор создаст новые изображения; пока они не готовы, факт не будет отправлен."))return;
+ const btn=$("igfacts-slide-save");btn.disabled=true;
+ try{
+  await api("/api/integrations/instagram/editorial/slides",{id:Number(p.id),en,ru});
+  $("igfacts-slide-editor").close();
+  await loadEditorial();
+  err("Тексты сохранены. Новые версии четырёх слайдов подготавливаются. Перед публикацией откройте изображения для проверки.");
+ }catch(e){err(e.message)}
+ finally{btn.disabled=false}
+};
 $("igfacts-save").onclick=async()=>{
  const p=state.igFactEdit;if(!p)return;
  const caption=$("igfacts-edit-text").value.trim();

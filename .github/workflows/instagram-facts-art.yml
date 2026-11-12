@@ -1,8 +1,9 @@
-name: Prepare Instagram Facts cards (no publishing)
+name: Prepare 4-slide Instagram Facts carousels (no publishing)
 on:
   push:
     paths:
       - ".github/instagram-fact-cards-trigger.txt"
+      - "instagram_fact_slide_overrides.json"
   workflow_dispatch:
 permissions:
   contents: write
@@ -18,7 +19,7 @@ jobs:
           persist-credentials: true
       - name: Install graphic backend
         run: python3 -m pip install Pillow==11.3.0
-      - name: Render 15 editorial cards
+      - name: Render 15 four-slide editorial carousels
         run: python3 scripts/prepare_instagram_facts.py
       - name: Validate cards
         run: |
@@ -26,12 +27,12 @@ jobs:
           from PIL import Image
           from pathlib import Path
           cards=list(Path("instagram-media/facts").glob("fact-*.jpg"))
-          assert len(cards)==15,len(cards)
+          assert len(cards)>=75,len(cards)
           for card in cards:
               im=Image.open(card)
               assert im.size==(1080,1350),card
               assert card.stat().st_size>30000,card
-          print("Validated",len(cards),"original Instagram fact cards")
+          print("Validated",len(cards),"files across 15 four-slide Instagram carousels")
           PY
       - name: Store media without touching Instagram state
         run: |
@@ -39,6 +40,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add instagram-media/facts/*.jpg
           if ! git diff --cached --quiet; then
-            git commit -m "Prepare 15 bilingual Instagram Facts covers [skip ci]"
+            git commit -m "Prepare 15 four-slide Instagram Facts carousels [skip ci]"
             git push origin HEAD:"${GITHUB_REF_NAME}"
           fi
