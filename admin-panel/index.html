@@ -110,7 +110,7 @@ dialog::backdrop{background:#000b}
 <section id="igfacts-section" hidden>
 <div class="panel">
  <div class="between"><div><h2>Instagram · Факты об искусстве</h2><small>Независимая очередь: с факта №1, без учёта Telegram и MAX</small></div><span class="status" id="igfacts-status">Загрузка</span></div>
- <p>Цикл: <b>Факт → Картина → Картина</b>, затем следующий факт. Четыре публикации в ленте в неделю: общие слоты Instagram. Открывайте тексты и медиа перед публикацией, редактируйте только Instagram-версию.</p>
+ <p>Цикл: <b>Факт → Картина → Картина</b>. Каждый факт - карусель из четырёх слайдов: обложка, English, Русский, финал. Все материалы доступны для просмотра перед отправкой через Buffer.</p>
  <div class="next-time"><small>Следующий выпуск в ленте · МСК</small><strong id="igfacts-next">Загрузка…</strong><small id="igfacts-kind">Формат и произведение определяются по очереди и готовности медиа. План может измениться после отправки Buffer.</small></div>
  <button id="igfacts-toggle" disabled>Проверка…</button><button id="igfacts-refresh" type="button">Обновить</button>
  <small style="display:block;margin-top:10px">Включение фактов заменяет каждый третий слот картины; Telegram и MAX не затрагиваются. Публикация зависит от подтверждения Buffer.</small>
@@ -298,7 +298,7 @@ function renderEditorial(){
   const left=document.createElement("div");left.style.cssText="display:flex;align-items:center;gap:12px;min-width:0;flex:1";
   if(item.photo){const img=document.createElement("img");img.src=item.photo;img.alt="Фото запланированной публикации";img.loading="lazy";img.referrerPolicy="no-referrer";img.style.cssText="width:52px;height:64px;object-fit:contain;background:#29251f;border:1px solid var(--line)";left.append(img)}
   const label=document.createElement("div");label.style.minWidth="0";
-  const title=document.createElement("b");title.textContent=(item.kind==="fact"?"Факт":item.format==="reel"?"Reel":item.format==="carousel"?"Карусель":"Пост")+" · "+item.title;
+  const title=document.createElement("b");title.textContent=(item.kind==="fact"?"Карусель · Факт":item.format==="reel"?"Reel":item.format==="carousel"?"Карусель":"Пост")+" · "+item.title;
   const when=document.createElement("small");when.style.display="block";when.textContent=date(item.at)+" МСК · предварительный план";
   label.append(title,when);left.append(label);r.append(left);
   if(item.id){
@@ -320,6 +320,17 @@ function renderEditorial(){
   const heading=document.createElement("b");heading.textContent="Факт №"+p.id+" · "+p.title;body.append(heading);
   const note=document.createElement("small");note.textContent=p.excluded?"Исключён":p.status==="queue"?"Ожидает":p.status;body.append(note);
   const preview=document.createElement("div");preview.className="summary";preview.textContent=p.caption;body.append(preview);
+  if(p.slides?.length===4){
+   const hint=document.createElement("small");hint.style.cssText="display:block;margin-top:12px;color:var(--gold)";hint.textContent="Карусель · 4 слайда · 1080 × 1350 · нажмите фото для увеличения";body.append(hint);
+   const slides=document.createElement("div");slides.className="ig-gallery";
+   for(let i=0;i<p.slides.length;i++){
+    const link=document.createElement("a");link.href=p.slides[i];link.target="_blank";link.rel="noopener noreferrer";link.style.cssText="display:flex;flex-direction:column;align-items:start;gap:4px;flex-shrink:0";
+    const img=document.createElement("img");img.src=p.slides[i];img.alt="Слайд "+(i+1)+" из четырёх";img.loading="lazy";
+    const label=document.createElement("small");label.textContent=["01 · Обложка","02 · English","03 · Русский","04 · Галерея"][i];
+    link.append(img,label);slides.append(link);
+   }
+   body.append(slides);
+  }
   const actions=document.createElement("div");actions.className="actions";
   actions.append(button("Полный текст / изменить",()=>editorialEdit("fact",p)));
   if(p.status==="queue"){
