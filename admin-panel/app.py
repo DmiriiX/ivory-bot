@@ -481,8 +481,8 @@ async def instagram_editorial_caption(data:InstagramEditorialEdit,
 
 class InstagramFactSlideEdit(BaseModel):
     id: int = Field(ge=1,le=15)
-    en: str = Field(min_length=20,max_length=360)
-    ru: str = Field(min_length=20,max_length=360)
+    en: str = Field(min_length=20,max_length=280)
+    ru: str = Field(min_length=20,max_length=280)
 
 
 @app.post("/api/integrations/instagram/editorial/slides")
