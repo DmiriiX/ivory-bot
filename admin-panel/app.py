@@ -20,7 +20,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from media import normalized_image
 from instagram_gallery import discover_gallery, format_for_gallery
-from instagram_facts import FACTS, fact_caption, fact_key, fact_media, next_fact, feed_calendar, cycle_next_kind
+from instagram_facts import FACTS, fact_caption, fact_key, fact_media, fact_slides, next_fact, feed_calendar, cycle_next_kind
 from instagram_editorial import make_editorial_reel
 from schedule_info import next_post, next_instagram_check, next_instagram_publication, next_instagram_story
 from instagram import post_caption as instagram_post_caption, inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story
@@ -410,6 +410,7 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
         "facts":[
             {"id":str(f["id"]),"title":f.get("title"),"photo":fact_media(f),
              "caption":overrides.get(str(f["id"])) or fact_caption(f),
+             "slides":fact_slides(f),"format":"carousel",
              "excluded":str(f["id"]) in exclusions,
              "status":(records.get(fact_key(f)) or {}).get("status","queue")}
             for f in facts if int(f.get("id",0)) in FACTS],
