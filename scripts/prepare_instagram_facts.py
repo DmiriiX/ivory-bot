@@ -6,6 +6,8 @@ quiet site CTA. All text sourced from independently curated FACTS.
 This script NEVER publishes to Instagram or Buffer.
 """
 import sys
+import json
+import re
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
@@ -104,6 +106,7 @@ def save(im,path):
         assert check.size==(W,H)
     print("GENERATED",path.relative_to(ROOT),path.stat().st_size)
 
+overrides=json.loads((ROOT/"instagram_fact_slide_overrides.json").read_text(encoding="utf-8"))
 for raw_id,record in FACTS.items():
     num=int(raw_id)
     cards=[render_cover(num,record),render_text(num,record,True),
@@ -112,3 +115,13 @@ for raw_id,record in FACTS.items():
         save(im,OUT/f"fact-{num:02d}-{slide}.jpg")
     # Keep the original cover URL for existing Mini App users.
     save(cards[0],OUT/f"fact-{num:02d}.jpg")
+    revision=overrides.get(raw_id) or {}
+    if revision:
+        rev=revision.get("revision","")
+        if not re.fullmatch(r"[0-9a-f]{12}",rev):
+            raise ValueError("Invalid revision for fact "+raw_id)
+        edited=dict(record,en=revision["en"],ru=revision["ru"])
+        amended=[render_cover(num,edited),render_text(num,edited,True),
+                 render_text(num,edited,False),render_final(num,edited)]
+        for slide,im in enumerate(amended,1):
+            save(im,OUT/f"fact-{num:02d}-{slide}-{rev}.jpg")
