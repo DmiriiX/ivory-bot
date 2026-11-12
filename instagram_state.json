@@ -172,5 +172,10 @@
       "external_link": "https://www.instagram.com/stories/ivoryartgallery/4028161628785005071",
       "checked_at": "2026-11-11T16:29:37.253241+00:00"
     }
-  }
+  },
+  "ig_facts_enabled": true,
+  "ig_fact_next_id": 1,
+  "ig_fact_excluded": [],
+  "ig_fact_captions": {},
+  "ig_artwork_captions": {}
 }
