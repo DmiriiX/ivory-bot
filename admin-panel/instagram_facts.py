@@ -152,6 +152,15 @@ def fact_caption(fact):
 def fact_media(fact):
     return IMAGE_PREFIX+"fact-"+str(fact["id"]).zfill(2)+".jpg"
 
+def fact_slides(fact):
+    """Four 4:5 editorial slides, in reading order: cover, EN, RU, CTA."""
+    key=str(fact["id"])
+    if key not in FACTS:
+        raise ValueError("Unreviewed fact")
+    return [IMAGE_PREFIX+"fact-"+key.zfill(2)+"-"+str(n)+".jpg"
+            for n in range(1,5)]
+
+
 def cycle_records(state):
     return sorted(
        ((key,v) for key,v in (state.get("records") or {}).items()
