@@ -43,6 +43,27 @@ class FactsEditorialTests(unittest.TestCase):
   self.assertEqual(plan[3]["id"],"2")
   self.assertTrue(all(x["at"].endswith("+03:00") for x in plan))
 
+ def test_calendar_predicts_actual_artworks_and_media_types(self):
+  from instagram_facts import artwork_key
+  artworks=[
+   {"title":"Кафе в Венеции","artist":"Владимир Кожевников","photo":"https://example.com/1.jpg",
+    "link":"https://ivory-art.com/#ia-product-216435722902"},
+   {"title":"Жаркое лето","artist":"Алексей Рычков","photo":"https://example.com/2.jpg",
+    "link":"https://ivory-art.com/#ia-product-477049108772"}]
+  media={artwork_key(p):{"images":["one.jpg","two.jpg"],"reel":"video.mp4",
+                         "reel_style":"luxury"} for p in artworks}
+  state={"campaign":CAMPAIGN,"records":{"older":{"campaign":True,"kind":"artwork",
+           "status":"sent","format":"reel","campaign_date":"2026-11-09"}},
+         "ig_facts_enabled":True,"rich_media_enabled":True}
+  plan=feed_calendar(state,FACT_LIST,now=datetime(2026,11,12,12,0,tzinfo=MSK),
+                     artworks=artworks,media=media,count=3)
+  self.assertEqual(plan[0]["kind"],"fact")
+  self.assertEqual(plan[1]["title"],"Кафе в Венеции")
+  self.assertEqual(plan[1]["format"],"carousel")
+  self.assertEqual(plan[2]["title"],"Жаркое лето")
+  self.assertEqual(plan[2]["format"],"reel")
+  self.assertEqual(plan[2]["id"],artwork_key(artworks[1]))
+
  def test_editorial_caption_override_used_by_buffer(self):
   import asyncio
   async def check():
