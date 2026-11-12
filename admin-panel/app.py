@@ -408,6 +408,18 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
     records=history.get("records") or {}
     exclusions=set(str(i) for i in history.get("ig_fact_excluded",[]))
     overrides=history.get("ig_fact_captions") or {}
+    story_slot=next_instagram_story(history)
+    story_records=history.get("story_records") or {}
+    used_story_ids={v.get("artwork_id") for v in story_records.values()}
+    ready_story=sorted(((key,record) for key,record in records.items()
+                        if record.get("status")=="sent" and key not in used_story_ids
+                        and len((prepared.get(key) or {}).get("stories") or [])==3),
+                       key=lambda pair:pair[1].get("created_at", ""),reverse=True)
+    slot_day=story_slot.get("next_at", "")[:10]
+    in_progress=next((v.get("artwork_id") for v in story_records.values()
+                      if v.get("campaign_date")==slot_day and v.get("artwork_id")),None)
+    story_id=in_progress or (ready_story[0][0] if ready_story else None)
+    story_artwork=next((p for p in artworks if identity("paintings",p)==story_id),None)
     drafts = []
     for fact in facts:
         fact_id = str(fact["id"])
@@ -426,7 +438,11 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
     return {
         "facts_enabled":bool(history.get("ig_facts_enabled",False)),
         "next_kind":cycle_next_kind(history) if history.get("ig_facts_enabled") else "artwork",
-        "calendar":feed_calendar(history,facts,artworks=artworks,media=prepared),
+        "calendar":feed_calendar(history,facts,artworks=artworks,
+                                 media=prepared if history.get("rich_media_enabled") else {}),
+        "story_plan":({"kind":"story","format":"story","at":story_slot["next_at"],
+                       "id":story_id,"title":(story_artwork or {}).get("title") or "Работа будет выбрана после публикации картины",
+                       "status":"planned"} if story_slot.get("next_at") else None),
         "facts": drafts,
         "artworks":[
             {"id":identity("paintings",p),"title":p.get("title"),"artist":p.get("artist"),

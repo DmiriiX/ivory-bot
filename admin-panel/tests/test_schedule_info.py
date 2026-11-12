@@ -23,6 +23,11 @@ class UpcomingScheduleTests(unittest.TestCase):
         self.assertEqual(dt.date().isoformat(),"2026-11-12")
         self.assertTrue(18 <= dt.hour < 21)
 
+    def test_late_thursday_still_shows_pending_facts_slot(self):
+        slot=next_post("facts", "2026-09-24T19:17:40+03:00",
+                       now=datetime(2026,11,12,21,20,tzinfo=MSK))
+        self.assertEqual(slot["next_at"],"2026-11-12T19:00:00+03:00")
+
     def test_pause_or_no_queue_has_no_time(self):
         self.assertEqual(next_post("paintings",paused=True)["reason"],"paused")
         self.assertEqual(next_post("paintings",remaining=0)["reason"],"empty")

@@ -29,7 +29,7 @@ def next_post(kind, last_post_at=None, paused=False, pending=None,
         except (TypeError, ValueError):
             pass
     facts = kind == "facts"
-    start, end = (18, 21) if facts else (11, 20)
+    start, end = (19, 24) if facts else (11, 20)
     interval = 7 if facts else 3
     for day_offset in range(0, 120):
         day = now.date() + timedelta(days=day_offset)
@@ -38,9 +38,9 @@ def next_post(kind, last_post_at=None, paused=False, pending=None,
         if last_date and (day - last_date).days < interval:
             continue
         date_key = ("facts:" if facts else "paintings:") + str(day)
-        hour = start + int(hashlib.sha256(date_key.encode()).hexdigest(), 16) % (end - start)
+        hour = 19 if facts else start + int(hashlib.sha256(date_key.encode()).hexdigest(), 16) % (end - start)
         candidate = datetime.combine(day, time(hour, 0), tzinfo=MSK)
-        if candidate <= now:
+        if candidate <= now and not facts:
             continue
         return {
             "next_at": candidate.isoformat(),
