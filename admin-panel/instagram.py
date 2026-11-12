@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from schedule_info import next_instagram_publication
 from instagram_campaign import due_now, feed_format
+from instagram_facts import next_fact, cycle_next_kind, fact_key, fact_caption, fact_media
 import base64
 from media import normalized_image
 from instagram_translations import TITLES, ARTISTS
@@ -293,7 +294,7 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
         assets = [{"image": {"url": image_url}}]
         kind = "post"
     payload = {
-        "text": "" if kind == "story" else post_caption(post),
+        "text": "" if kind == "story" else (post.get("instagram_caption") or post_caption(post)),
         "channelId": channel_id,
         "schedulingType": "automatic",
         "mode": "shareNow",
@@ -374,6 +375,55 @@ async def sync_instagram(read_file, update_file, identity, github_api):
                 or datetime.fromisoformat(today_slot["next_at"]).date() != now_msk.date()):
             return {"ok": True, "reason": "Instagram cadence: next publishing slot",
                     "next_publication": next_instagram_publication(state)}
+    # Independent Instagram editorial series. It starts at fact #1 regardless
+    # of what Telegram/MAX facts bot has already posted. No IG history reset.
+    if in_campaign and state.get("ig_facts_enabled") and cycle_next_kind(state) == "fact":
+        facts, _ = await read_file("facts", "posts.json")
+        fact = next_fact(facts, state)
+        if not fact:
+            return {"ok": True, "reason": "Instagram facts queue exhausted; review before publishing artwork"}
+        item_id = fact_key(fact)
+        image_url = fact_media(fact)
+        # Validate public media before writing a no-repeat reservation.
+        async with httpx.AsyncClient(timeout=16, follow_redirects=True) as client:
+            try:
+                response = await client.head(image_url)
+                if response.status_code != 200 or not response.headers.get("content-type","").startswith("image/"):
+                    return {"ok": False, "reason": "Fact image not ready", "id": item_id}
+            except httpx.HTTPError:
+                return {"ok": False, "reason": "Fact image unreachable", "id": item_id}
+        override = (state.get("ig_fact_captions") or {}).get(str(fact["id"]))
+        text = override if isinstance(override,str) and override.strip() else fact_caption(fact)
+        prepared_post = {"photo":image_url, "title":fact.get("title"), "instagram_caption":text}
+        records[item_id] = {
+            "title":fact.get("title"),"status":"uncertain","format":"post",
+            "editorial_cycle":True,"kind":"fact","fact_id":fact["id"],
+            "created_at":datetime.now(timezone.utc).isoformat(),
+            "campaign":True,"campaign_date":now_msk.date().isoformat(),
+        }
+        updated = await update_file("paintings","instagram_state.json",state,sha,
+                                    "Reserve Instagram Fact independently from TG/MAX")
+        new_sha=(updated.get("content") or {}).get("sha") or (await read_file("paintings","instagram_state.json"))[1]
+        try:
+            remote=await create_buffer_post((await instagram_channel())["id"],prepared_post,image_url)
+        except ValueError as exc:
+            records[item_id]["status"]="failed"
+            records[item_id]["error"]=str(exc)[:230]
+            await update_file("paintings","instagram_state.json",state,new_sha,"Record Buffer fact rejection")
+            return {"ok":False,"reason":"Buffer rejected fact","id":item_id}
+        except Exception as exc:
+            records[item_id]["failure_type"]=type(exc).__name__
+            try:
+                await update_file("paintings","instagram_state.json",state,new_sha,"Record uncertain Instagram Fact without retry")
+            except Exception:
+                pass
+            return {"ok":False,"reason":"Instagram Fact delivery uncertain; manual review required","id":item_id}
+        records[item_id]["buffer_post_id"]=remote["id"]
+        records[item_id]["buffer_status"]=remote.get("status")
+        records[item_id]["status"]="accepted" if remote.get("status") not in ("error","failed") else "failed"
+        await update_file("paintings","instagram_state.json",state,new_sha,"Record Instagram Fact accepted by Buffer")
+        return {"ok":records[item_id]["status"]=="accepted","id":item_id,"status":records[item_id]["status"],"kind":"fact"}
+
     one_shot_id = state.get("test_post_id")
     test_candidate = next((p for p in posts if identity("paintings", p) == one_shot_id
                            and one_shot_id in used and one_shot_id not in records), None)
@@ -407,11 +457,16 @@ async def sync_instagram(read_file, update_file, identity, github_api):
     if not new:
         return {"ok": True, "reason": "No eligible artwork to publish"}
     item_id = identity("paintings", new)
+    override=(state.get("ig_artwork_captions") or {}).get(item_id)
+    if isinstance(override,str) and override.strip():
+        new=dict(new,instagram_caption=override)
     # Write intent before network request; ambiguous failures never duplicate automatically.
     records[item_id] = {
         "title": new.get("title"), "status": "uncertain",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "campaign": in_campaign,
+        "editorial_cycle": bool(in_campaign and state.get("ig_facts_enabled")),
+        "kind": "artwork",
         "campaign_date": now_msk.date().isoformat() if in_campaign else None,
     }
     updated = await update_file("paintings", "instagram_state.json", state, sha, "Reserve artwork for Instagram, prevent duplicates")
