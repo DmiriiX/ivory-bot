@@ -1,1 +1,3 @@
 First render on main after campaign code tests pass; no Instagram publishing.
+
+Re-render all fifteen four-card carousels: cover, EN, RU, gallery CTA. No Instagram posts.
