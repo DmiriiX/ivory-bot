@@ -51,6 +51,15 @@
       "buffer_status": "sending",
       "external_link": "https://www.instagram.com/p/DfpeL4XGkl-/",
       "checked_at": "2026-11-12T16:21:02.525614+00:00"
+    },
+    "07cf3fcfca91eb5d4197b40f": {
+      "title": "Кафе в Венеции",
+      "status": "uncertain",
+      "created_at": "2026-11-14T19:48:30.122012+00:00",
+      "campaign": true,
+      "editorial_cycle": true,
+      "kind": "artwork",
+      "campaign_date": "2026-11-14"
     }
   },
   "failed_attempts": [
