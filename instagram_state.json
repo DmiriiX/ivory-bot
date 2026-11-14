@@ -54,7 +54,7 @@
     },
     "07cf3fcfca91eb5d4197b40f": {
       "title": "Кафе в Венеции",
-      "status": "accepted",
+      "status": "sent",
       "created_at": "2026-11-14T19:48:30.122012+00:00",
       "campaign": true,
       "editorial_cycle": true,
@@ -62,7 +62,9 @@
       "campaign_date": "2026-11-14",
       "format": "carousel",
       "buffer_post_id": "6af8bb10e5a113497aa4bb75",
-      "buffer_status": "sending"
+      "buffer_status": "sending",
+      "external_link": "https://www.instagram.com/p/Dfu_nS5HZnR/",
+      "checked_at": "2026-11-14T23:44:09.757968+00:00"
     }
   },
   "failed_attempts": [
