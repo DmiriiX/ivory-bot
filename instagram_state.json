@@ -68,7 +68,7 @@
     },
     "d23b2f272e3ebd9df85517b5": {
       "title": "Зеленый чай",
-      "status": "accepted",
+      "status": "sent",
       "created_at": "2026-11-15T19:07:55.021854+00:00",
       "campaign": true,
       "editorial_cycle": true,
@@ -77,7 +77,9 @@
       "format": "reel",
       "reel_style": "luxury",
       "buffer_post_id": "6afa030d4f0276ab94594c4f",
-      "buffer_status": "sending"
+      "buffer_status": "sending",
+      "external_link": "https://www.instagram.com/reel/DfxfvBHD-hM/",
+      "checked_at": "2026-11-15T19:09:44.021272+00:00"
     }
   },
   "failed_attempts": [
