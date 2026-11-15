@@ -146,5 +146,48 @@ class InstagramSafetyTests(unittest.TestCase):
             self.assertEqual(caught.exception.status_code, 401)
         asyncio.run(trial())
 
+
+
+
+class ScheduledFeedTests(unittest.IsolatedAsyncioTestCase):
+    async def test_queue_at_moscow_time_and_confirm_exact_buffer_schedule(self):
+        from datetime import datetime
+        from unittest.mock import AsyncMock
+
+        state = {"enabled": True, "campaign": {"enabled": True},
+                 "records": {"previous": {"campaign_date": "2026-11-15", "status": "sent"}}}
+        now = datetime(2026, 11, 15, 22, tzinfo=instagram.MSK)
+        target, due_at = instagram.campaign_feed_target(state, now)
+        self.assertEqual(target.isoformat(), "2026-11-17T18:15:00+03:00")
+        self.assertEqual(target, due_at)
+        response = {"id": "queued-post", "status": "scheduled", "dueAt": "2026-11-17T15:15:00.000Z"}
+        graphql = AsyncMock(return_value={"createPost": {"post": response}})
+        with patch.object(instagram, "graphql", graphql):
+            await instagram.create_buffer_post("instagram", {"photo": "https://example.com/image.jpg"},
+                                               "https://example.com/image.jpg", due_at=due_at)
+        payload = graphql.call_args.args[1]["input"]
+        self.assertEqual(payload["mode"], "customScheduled")
+        self.assertEqual(payload["dueAt"], "2026-11-17T15:15:00Z")
+        record = {}
+        instagram.record_submission(record, response, due_at)
+        self.assertEqual(record["status"], "accepted")
+        instagram.record_submission(record, dict(response, status="draft"), due_at)
+        self.assertEqual(record["status"], "uncertain")
+
+    async def test_pause_moves_only_the_queued_post_to_draft(self):
+        from unittest.mock import AsyncMock
+
+        queued = {"status": "accepted", "scheduled_for": "2026-11-17T18:15:00+03:00",
+                  "buffer_post_id": "queued"}
+        sent = {"status": "sent", "buffer_post_id": "sent"}
+        edit = AsyncMock(return_value={"status": "draft"})
+        with patch.object(instagram, "get_buffer_status", AsyncMock(return_value={"status": "scheduled"})), \
+             patch.object(instagram, "edit_buffer_post", edit):
+            await instagram.hold_scheduled_feed({"records": {"q": queued, "s": sent}})
+        edit.assert_awaited_once_with("queued", saveToDraft=True)
+        self.assertEqual(queued["status"], "held")
+        self.assertEqual(sent["status"], "sent")
+
+
 if __name__ == "__main__":
     unittest.main()

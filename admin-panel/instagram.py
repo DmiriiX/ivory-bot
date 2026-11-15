@@ -9,10 +9,10 @@ import html
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from schedule_info import next_instagram_publication
-from instagram_campaign import due_now, feed_format
+from instagram_campaign import MSK, campaign_slot, due_now, feed_format
 from instagram_facts import MAX_FACT_CAPTION_LENGTH, next_fact, cycle_next_kind, fact_key, fact_caption, fact_slides
 import base64
 from media import normalized_image
@@ -27,6 +27,8 @@ BUFFER_API = "https://api.buffer.com"
 AUDIENCE = "ivory-art-instagram-sync"
 REPOSITORY_ID = "1345393882"
 WORKFLOW_REF = "DmiriiX/ivory-bot/.github/workflows/instagram-sync.yml@refs/heads/main"
+FEED_QUEUE_LEAD = timedelta(hours=48)
+FEED_LOCK = asyncio.Lock()
 OIDC_KEYS = PyJWKClient("https://token.actions.githubusercontent.com/.well-known/jwks", cache_jwk_set=True, lifespan=3600)
 
 def token_available():
@@ -283,14 +285,21 @@ async def unavailable_fact_slide(slides):
     return next((index for index, result in enumerate(results, 1) if not result), None)
 
 
-async def create_buffer_post(channel_id, post, image_url, media=None, kind='post'):
+def buffer_schedule(due_at):
+    return {
+        "mode": "customScheduled",
+        "dueAt": due_at.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+
+
+async def create_buffer_post(channel_id, post, image_url, media=None, kind='post', due_at=None):
     url = post.get("photo", "")
     if not url.startswith("https://"):
         raise ValueError("Artwork needs a publicly accessible HTTPS image")
     mutation = """
     mutation($input: CreatePostInput!) {
       createPost(input: $input) {
-        ... on PostActionSuccess { post { id status channelId } }
+        ... on PostActionSuccess { post { id status channelId dueAt } }
         ... on MutationError { message }
       }
     }
@@ -324,6 +333,8 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
         "assets": assets,
         "metadata": {"instagram": {"type": buffer_type, "shouldShareToFeed": kind != "story"}},
     }
+    if due_at is not None:
+        payload.update(buffer_schedule(due_at))
     data = await graphql(mutation, {"input": payload})
     result = data.get("createPost") or {}
     if result.get("post", {}).get("id"):
@@ -332,12 +343,88 @@ async def create_buffer_post(channel_id, post, image_url, media=None, kind='post
 
 async def get_buffer_status(buffer_post_id):
     data = await graphql(
-        "query($id: PostId!) { post(input: {id: $id}) { id status sentAt externalLink error { message supportUrl } } }",
+        "query($id: PostId!) { post(input: {id: $id}) { id status dueAt sentAt externalLink error { message supportUrl } } }",
         {"id": buffer_post_id},
     )
     return data["post"]
 
+async def edit_buffer_post(post_id, **changes):
+    data = await graphql(
+        """mutation($input: EditPostInput!) {
+          editPost(input: $input) {
+            ... on PostActionSuccess { post { id status dueAt } }
+            ... on MutationError { message }
+          }
+        }""",
+        {"input": {"id": post_id, **changes}},
+    )
+    result = data.get("editPost") or {}
+    if result.get("post", {}).get("id") != post_id:
+        raise ValueError(result.get("message") or "Buffer rejected the edit")
+    return result["post"]
+
+
+async def hold_scheduled_feed(state):
+    for record in (state.get("records") or {}).values():
+        if record.get("status") != "accepted" or not record.get("scheduled_for"):
+            continue
+        post_id = record["buffer_post_id"]
+        remote = await get_buffer_status(post_id)
+        if remote["status"] in ("sent", "error", "failed"):
+            apply_delivery_status(record, remote)
+            continue
+        if remote["status"] == "scheduled":
+            remote = await edit_buffer_post(post_id, saveToDraft=True)
+        if remote["status"] != "draft":
+            raise ValueError("Buffer is already processing this Instagram publication")
+        record.update(status="held", buffer_status="draft")
+
+
+def campaign_feed_target(state, now):
+    """Return the next campaign slot and whether it should be queued in Buffer."""
+    slot = next_instagram_publication(state, now=now).get("next_at")
+    if not slot:
+        return None, None
+    target = datetime.fromisoformat(slot)
+    if target > now + FEED_QUEUE_LEAD:
+        return None, None
+    if target > now:
+        return target, target
+    if due_now(state["campaign"], "feed", now):
+        return target, None
+    return None, None
+
+
+def apply_delivery_status(record, remote):
+    record["status"] = remote["status"]
+    record["buffer_status"] = remote["status"]
+    record["external_link"] = remote.get("externalLink")
+    record["checked_at"] = datetime.now(timezone.utc).isoformat()
+    if remote["status"] != "sent":
+        record["error"] = ((remote.get("error") or {}).get("message") or "Buffer failed to publish")[:300]
+
+
+def record_submission(record, remote, due_at):
+    record["buffer_post_id"] = remote["id"]
+    record["buffer_status"] = remote.get("status")
+    if remote.get("status") in ("error", "failed"):
+        apply_delivery_status(record, remote)
+    elif due_at and (remote.get("status") != "scheduled" or not remote.get("dueAt")
+                     or datetime.fromisoformat(remote["dueAt"]) != due_at):
+        record["status"] = "uncertain"
+        record["error"] = "Buffer did not confirm the requested schedule"
+    else:
+        record["status"] = "accepted"
+
+
 async def sync_instagram(read_file, update_file, identity, github_api, manual=False,
+                         selected_kind=None, selected_id=None, selected_format=None):
+    async with FEED_LOCK:
+        return await _sync_instagram(read_file, update_file, identity, github_api, manual,
+                                     selected_kind, selected_id, selected_format)
+
+
+async def _sync_instagram(read_file, update_file, identity, github_api, manual=False,
                          selected_kind=None, selected_id=None, selected_format=None):
     """One accepted post maximum per run; never resubmit uncertain or accepted IDs."""
     state, sha = await read_file("paintings", "instagram_state.json")
@@ -365,13 +452,11 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
 
     # Check previously accepted posts without creating duplicates.
     for item_id, record in list(records.items()):
-        if record.get("status") == "accepted" and record.get("buffer_post_id"):
+        if record.get("status") in ("accepted", "uncertain") and record.get("buffer_post_id"):
             try:
                 remote = await get_buffer_status(record["buffer_post_id"])
                 if remote.get("status") in ("sent", "error", "failed"):
-                    record["status"] = remote["status"]
-                    record["external_link"] = remote.get("externalLink")
-                    record["checked_at"] = datetime.now(timezone.utc).isoformat()
+                    apply_delivery_status(record, remote)
                     latest = await update_file("paintings", "instagram_state.json", state, sha, "Update Instagram delivery status")
                     sha = (latest.get("content") or {}).get("sha") or (await read_file("paintings", "instagram_state.json"))[1]
             except Exception:
@@ -379,17 +464,48 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
     # Don't start a second submission if one is uncertain.
     if any(v.get("status") == "uncertain" for v in records.values()):
         return {"ok": False, "reason": "Uncertain delivery requires manual review"}
-    if any(v.get("status") == "accepted" for v in records.values()):
+    if any(v.get("status") == "accepted" and (not (manual and selected_id) or
+           not v.get("scheduled_for") or datetime.fromisoformat(v["scheduled_for"]) <= datetime.now(MSK))
+           for v in records.values()):
         return {"ok": True, "reason": "Previous Buffer publication awaits delivery confirmation"}
     campaign = state.get("campaign") or {}
     in_campaign = bool(campaign.get("enabled"))
-    now_msk = datetime.now(ZoneInfo("Europe/Moscow"))
+    now_msk = datetime.now(MSK)
+    due_at = None
+    campaign_date = now_msk.date().isoformat()
+    held = next((record for record in records.values() if record.get("status") == "held"), None)
+    if held:
+        if manual:
+            return {"ok": False, "reason": "A held Instagram post awaits rescheduling"}
+        # Reuse the original draft and ID when Instagram is resumed.
+        target = datetime.fromisoformat(held["scheduled_for"])
+        if target <= now_msk:
+            slot = campaign_slot(campaign, now=now_msk).get("next_at")
+            if slot and datetime.fromisoformat(slot) <= now_msk:
+                slot = campaign_slot(campaign, now=now_msk + timedelta(days=1, hours=-now_msk.hour)).get("next_at")
+            if not slot or datetime.fromisoformat(slot) <= now_msk:
+                return {"ok": True, "reason": "No remaining campaign slot for the held Instagram draft"}
+            target = datetime.fromisoformat(slot)
+        if target > now_msk + FEED_QUEUE_LEAD:
+            return {"ok": True, "reason": "Held Instagram draft is outside the queueing window"}
+        remote = await get_buffer_status(held["buffer_post_id"])
+        if remote.get("status") == "draft":
+            remote = await edit_buffer_post(held["buffer_post_id"], saveToDraft=False,
+                                            **buffer_schedule(target))
+        held.update(scheduled_for=target.isoformat(), campaign_date=target.date().isoformat())
+        record_submission(held, remote, target)
+        await update_file("paintings", "instagram_state.json", state, sha, "Reschedule held Instagram draft")
+        return {"ok": held["status"] == "accepted", "status": held["status"],
+                "reason": held.get("error"), "scheduled_for": held["scheduled_for"]}
     if in_campaign:
-        if not manual and not due_now(campaign, "feed", now_msk):
-            return {"ok": True, "reason": "No campaign feed slot today",
-                    "next_publication": next_instagram_publication(state)}
-        if not (manual and selected_id) and any((rec.get("campaign_date") == now_msk.date().isoformat())
-               for rec in records.values()):
+        if not manual:
+            target, due_at = campaign_feed_target(state, now_msk)
+            if target is None:
+                return {"ok": True, "reason": "No campaign feed slot in the queueing window",
+                        "next_publication": next_instagram_publication(state)}
+            campaign_date = target.date().isoformat()
+        if not (manual and selected_id) and any(rec.get("campaign_date") == campaign_date
+                                                for rec in records.values()):
             return {"ok": True, "reason": "Feed slot already reserved today"}
     else:
         today_slot = next_instagram_publication(
@@ -434,14 +550,15 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
             "title":fact.get("title"),"status":"uncertain","format":"carousel",
             "editorial_cycle":True,"kind":"fact","fact_id":fact["id"],
             "created_at":datetime.now(timezone.utc).isoformat(),
-            "campaign":True,"campaign_date":now_msk.date().isoformat(),
+            "campaign":True,"campaign_date":campaign_date,
+            **({"scheduled_for": due_at.isoformat()} if due_at else {}),
         }
         updated = await update_file("paintings","instagram_state.json",state,sha,
                                     "Reserve Instagram Fact independently from TG/MAX")
         new_sha=(updated.get("content") or {}).get("sha") or (await read_file("paintings","instagram_state.json"))[1]
         try:
             remote=await create_buffer_post((await instagram_channel())["id"],prepared_post,image_url,
-                                            media={"images":slides},kind="fact_carousel")
+                                            media={"images":slides},kind="fact_carousel", due_at=due_at)
         except ValueError as exc:
             records[item_id]["status"]="failed"
             records[item_id]["error"]=str(exc)[:230]
@@ -454,11 +571,11 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
             except Exception:
                 pass
             return {"ok":False,"reason":"Instagram Fact delivery uncertain; manual review required","id":item_id}
-        records[item_id]["buffer_post_id"]=remote["id"]
-        records[item_id]["buffer_status"]=remote.get("status")
-        records[item_id]["status"]="accepted" if remote.get("status") not in ("error","failed") else "failed"
+        record_submission(records[item_id], remote, due_at)
         await update_file("paintings","instagram_state.json",state,new_sha,"Record Instagram Fact accepted by Buffer")
-        return {"ok":records[item_id]["status"]=="accepted","id":item_id,"status":records[item_id]["status"],"kind":"fact"}
+        return {"ok": records[item_id]["status"] == "accepted", "id": item_id,
+                "status": records[item_id]["status"], "kind": "fact",
+                "scheduled_for": records[item_id].get("scheduled_for"), "reason": records[item_id].get("error")}
 
     one_shot_id = state.get("test_post_id")
     test_candidate = next((p for p in posts if identity("paintings", p) == one_shot_id
@@ -511,7 +628,8 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
         "campaign": in_campaign,
         "editorial_cycle": bool(in_campaign and state.get("ig_facts_enabled")),
         "kind": "artwork",
-        "campaign_date": now_msk.date().isoformat() if in_campaign else None,
+        "campaign_date": campaign_date if in_campaign else None,
+        **({"scheduled_for": due_at.isoformat()} if due_at else {}),
     }
     updated = await update_file("paintings", "instagram_state.json", state, sha, "Reserve artwork for Instagram, prevent duplicates")
     new_sha = updated.get("content", {}).get("sha")
@@ -538,7 +656,7 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
             image_url = await ensure_public_image(new, item_id, github_api)
         remote = await create_buffer_post(
             (await instagram_channel())["id"], new, image_url,
-            media=prepared if chosen != "post" else None, kind=chosen)
+            media=prepared if chosen != "post" else None, kind=chosen, due_at=due_at)
         records[item_id]["format"] = chosen
         if chosen == "reel" and prepared:
             records[item_id]["reel_style"] = prepared.get("reel_style", "legacy")
@@ -559,15 +677,12 @@ async def sync_instagram(read_file, update_file, identity, github_api, manual=Fa
         except Exception:
             pass
         return {"ok": False, "reason": "Unknown Buffer delivery: inspect Buffer queue before retrying", "id": item_id}
-    records[item_id]["buffer_post_id"] = remote["id"]
-    records[item_id]["buffer_status"] = remote.get("status", "")
-    if remote.get("status") in ("error", "failed"):
-        records[item_id]["status"] = "failed"
-        await update_file("paintings", "instagram_state.json", state, new_sha, "Record Buffer media delivery error")
-        return {"ok": False, "id": item_id, "reason": "Buffer failed to publish the image"}
-    records[item_id]["status"] = "accepted"
-    await update_file("paintings", "instagram_state.json", state, new_sha, "Record Buffer accepted Instagram post")
-    return {"ok": True, "id": item_id, "status": "accepted"}
+    record = records[item_id]
+    record_submission(record, remote, due_at)
+    await update_file("paintings", "instagram_state.json", state, new_sha, "Record Instagram Buffer submission")
+    if record["status"] != "accepted":
+        return {"ok": False, "id": item_id, "reason": record.get("error", "Buffer submission failed")}
+    return {"ok": True, "id": item_id, "status": "accepted", "scheduled_for": record.get("scheduled_for")}
 
 
 async def sync_instagram_story(read_file, update_file, identity, manual=False, artwork_id=None):

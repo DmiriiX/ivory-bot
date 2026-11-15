@@ -205,6 +205,7 @@ for(const p of (x.metrics_posts||[]).slice().reverse()){
 }
 text($("ig-main-status"),!x.connected?"Не подключён":x.enabled?"Активен":"На паузе");
 text($("ig-main-summary"),!x.connected?"Buffer: "+(x.error||"нет подключения"):"Опубликовано: "+(x.sent||0)+" · ожидают Buffer: "+(x.accepted-(x.sent||0))+" · Stories: "+(x.story_sent||0));
+if(x.delivery_errors?.length)$("ig-main-summary").textContent+=" · "+x.delivery_errors.map(e=>e.title+": "+e.reason).join(" · ");
 text($("ig-main-metrics-time"),x.metrics_last_checked?"Обновлено: "+date(x.metrics_last_checked):"Первая проверка ещё не завершена");
 const visibleStats=$("ig-main-metrics-list");visibleStats.replaceChildren(...Array.from(stats.children,el=>el.cloneNode(true)));
 if(state.kind==="igfacts"&&state.igFacts)renderEditorial();
@@ -310,7 +311,7 @@ function renderEditorial(){
   if(!confirm(d.facts_enabled?"Приостановить факты Instagram?":"Включить факты в цикл Instagram?"))return;
   try{await api("/api/integrations/instagram/editorial/toggle",{enabled:!d.facts_enabled});await loadEditorial()}catch(e){err(e.message)}
  };
- const planned=(d.calendar||[]).map(item=>({...item,status:"planned"}));
+ const planned=[...(d.calendar||[]),...(d.buffer_queue||[])];
  if(d.story_plan)planned.push(d.story_plan);
  planned.sort((a,b)=>String(a.at).localeCompare(String(b.at)));
  const scheduled=new Set(planned.filter(x=>x.id).map(x=>x.kind+":"+x.id));
@@ -322,7 +323,7 @@ function renderEditorial(){
  }
  const mode=state.igFactFilter;
  const all=[...planned,...extras];
- const shown=all.filter(item=>(mode==="all"||mode==="planned"&&item.status==="planned"||mode==="queue"&&["planned","queue"].includes(item.status)||mode==="sent"&&["sent","accepted","failed","uncertain","error"].includes(item.status))
+ const shown=all.filter(item=>(mode==="all"||mode==="planned"&&item.status==="planned"||mode==="queue"&&["planned","queue","scheduled","held"].includes(item.status)||mode==="sent"&&["sent","accepted","failed","uncertain","error"].includes(item.status))
   &&(state.igFormatFilter==="all"||state.igFormatFilter==="fact"&&item.kind==="fact"||state.igFormatFilter==="carousel"&&item.kind!=="fact"&&item.format==="carousel"||!["fact","carousel"].includes(state.igFormatFilter)&&item.format===state.igFormatFilter));
  shown.sort((a,b)=>{const at=a.at||"",bt=b.at||"";if(!at)return bt?1:0;if(!bt)return -1;return state.igSort==="desc"?bt.localeCompare(at):at.localeCompare(bt)});
  text($("igfacts-total"),shown.length+" публикаций");
@@ -338,7 +339,7 @@ function renderEditorial(){
   const heading=document.createElement("b");
   const label=isStory?"Story":item.kind==="fact"?"Факт · карусель":item.format==="reel"?"Reel":item.format==="carousel"?"Карусель":"Картина";
   heading.textContent=label+" · "+(p?.title||item.title);body.append(heading);
-  const when=document.createElement("small");when.textContent=item.at?date(item.at)+" МСК · предварительный график":item.status==="queue"?"Ожидает даты":item.status==="excluded"?"Исключён":item.status==="planned"?"Ожидает выбора работы":item.status;body.append(when);
+  const when=document.createElement("small");when.textContent=item.at?date(item.at)+" МСК · "+({scheduled:"в очереди Buffer",held:"на паузе в Buffer"}[item.status]||"предварительный график"):item.status==="queue"?"Ожидает даты":item.status==="excluded"?"Исключён":item.status==="planned"?"Ожидает выбора работы":item.status;body.append(when);
   if(p?.artist){const artist=document.createElement("small");artist.textContent=p.artist;body.append(artist)}
   if(p?.caption&&!isStory){const full=document.createElement("details");full.className="ig-copy";const summary=document.createElement("summary");summary.textContent="Посмотреть полный текст";
    const pre=document.createElement("pre");pre.textContent=p.caption;full.append(summary,pre);body.append(full)}
@@ -348,7 +349,7 @@ function renderEditorial(){
   if(item.format==="reel"&&p?.reel){const video=document.createElement("video");video.controls=true;video.preload="none";video.playsInline=true;video.poster=p.photo;video.src=p.reel;
    video.style.cssText="width:min(100%,260px);max-height:390px;background:#111;display:block;margin-top:10px";body.append(video)}
   const actions=document.createElement("div");actions.className="actions";
-  if(p&&!isStory){actions.append(button("Изменить текст",()=>editorialEdit(item.kind,p)))}
+  if(p&&!isStory&&["queue","scheduled","held"].includes(item.status)){actions.append(button("Изменить текст",()=>editorialEdit(item.kind,p)))}
   if(item.kind==="fact"&&p?.status==="queue"){
    actions.append(button("Текст слайдов EN / RU",()=>{state.igFactSlideEdit=p;text($("igfacts-slide-edit-title"),"Факт №"+p.id+" · "+p.title);$("igfacts-slide-en").value=p.slide_en||"";$("igfacts-slide-ru").value=p.slide_ru||"";$("igfacts-slide-editor").showModal()}));
    actions.append(button(p.excluded?"Вернуть":"Исключить",async()=>{try{await api("/api/integrations/instagram/editorial/exclude",{id:Number(p.id),excluded:!p.excluded});await loadEditorial()}catch(e){err(e.message)}}));

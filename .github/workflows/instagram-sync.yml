@@ -1,6 +1,8 @@
 name: Sync newly published paintings to Instagram via Buffer
 on:
   schedule:
+    # Fill the next Buffer slot during the day and reconcile yesterday’s delivery.
+    - cron: "11,37 5,8,11,14 * * *"
     # First attempt at 18:15 Moscow. Retry at staggered minutes to avoid
     # GitHub's hourly traffic peak. The backend enforces the feed calendar,
     # the 23:45 cutoff and one automatic publication per Moscow date.

@@ -27,7 +27,7 @@ from instagram_facts import (
 from instagram_fact_layout import MAX_SLIDE_TEXT_LENGTH, fact_text_pages
 from instagram_editorial import make_editorial_reel
 from schedule_info import next_post, next_instagram_check, next_instagram_publication, next_instagram_story
-from instagram import post_caption as instagram_post_caption, inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story, unavailable_fact_slide
+from instagram import post_caption as instagram_post_caption, inspection as buffer_inspection, sync_instagram, verify_github_oidc, get_buffer_status, list_recent_instagram_posts, collect_post_metrics, sync_instagram_story, unavailable_fact_slide, FEED_LOCK, edit_buffer_post, hold_scheduled_feed
 
 app = FastAPI(title="IVORY-ART Admin", docs_url=None, redoc_url=None)
 HERE = os.path.dirname(__file__)
@@ -440,6 +440,13 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
         "next_kind":cycle_next_kind(history) if history.get("ig_facts_enabled") else "artwork",
         "calendar":feed_calendar(history,facts,artworks=artworks,
                                  media=prepared if history.get("rich_media_enabled") else {}),
+        "buffer_queue": [
+            {"at": record["scheduled_for"], "kind": record["kind"], "format": record["format"],
+             "id": str(record["fact_id"]) if record["kind"] == "fact" else key,
+             "title": record["title"], "status": "held" if record["status"] == "held" else "scheduled"}
+            for key, record in records.items()
+            if record.get("scheduled_for") and record.get("status") in ("accepted", "held")
+        ],
         "story_plan":({"kind":"story","format":"story","at":story_slot["next_at"],
                        "id":story_id,"title":(story_artwork or {}).get("title") or "Работа будет выбрана после публикации картины",
                        "status":"planned"} if story_slot.get("next_at") else None),
@@ -486,28 +493,37 @@ async def instagram_editorial_toggle(data:InstagramEditorialSwitch,
 async def instagram_editorial_caption(data:InstagramEditorialEdit,
                                       x_telegram_init_data:str=Header(default="")):
     authenticate(x_telegram_init_data)
-    history,sha=await read_file("paintings","instagram_state.json")
-    records=history.get("records") or {}
-    if data.kind=="fact":
-        facts,_=await read_file("facts","posts.json")
-        if data.id not in {str(f.get("id")) for f in facts}:
-            raise HTTPException(404,"Unknown fact")
-        if fact_key({"id":data.id}) in records:
-            raise HTTPException(409,"This fact is reserved or already published; cannot edit")
-        if len(data.caption.strip()) > MAX_FACT_CAPTION_LENGTH:
-            raise HTTPException(422, f"Подпись может содержать до {MAX_FACT_CAPTION_LENGTH} символов")
-        target="ig_fact_captions"
-    else:
-        posts,_=await read_file("paintings","posts.json")
-        if data.id not in {identity("paintings",p) for p in posts}:
-            raise HTTPException(404,"Unknown artwork")
-        if data.id in records:
-            raise HTTPException(409,"This artwork is reserved or already published")
-        target="ig_artwork_captions"
-    history.setdefault(target,{})[data.id]=data.caption.strip()
-    await update_file("paintings","instagram_state.json",history,sha,
-                      "Admin: update Instagram-only "+data.kind+" draft [skip ci]")
-    return {"ok":True,"kind":data.kind,"id":data.id}
+    async with FEED_LOCK:
+        history,sha=await read_file("paintings","instagram_state.json")
+        records=history.get("records") or {}
+        if data.kind=="fact":
+            facts,_=await read_file("facts","posts.json")
+            if data.id not in {str(f.get("id")) for f in facts}:
+                raise HTTPException(404,"Unknown fact")
+            key = fact_key({"id": data.id})
+            if len(data.caption.strip()) > MAX_FACT_CAPTION_LENGTH:
+                raise HTTPException(422, f"Подпись может содержать до {MAX_FACT_CAPTION_LENGTH} символов")
+            target="ig_fact_captions"
+        else:
+            posts,_=await read_file("paintings","posts.json")
+            if data.id not in {identity("paintings",p) for p in posts}:
+                raise HTTPException(404,"Unknown artwork")
+            key = data.id
+            target="ig_artwork_captions"
+        record = records.get(key)
+        if record:
+            if not record.get("scheduled_for") or record.get("status") not in ("accepted", "held"):
+                raise HTTPException(409, "Публикация уже отправлена или обрабатывается")
+            try:
+                remote = await edit_buffer_post(record["buffer_post_id"], text=data.caption.strip())
+                if remote.get("status") not in ("scheduled", "draft"):
+                    raise ValueError("Buffer уже начал публикацию")
+            except (ValueError, RuntimeError, httpx.HTTPError) as exc:
+                raise HTTPException(409, "Buffer не подтвердил изменение: " + str(exc)) from exc
+        history.setdefault(target,{})[data.id]=data.caption.strip()
+        await update_file("paintings","instagram_state.json",history,sha,
+                          "Admin: update Instagram-only "+data.kind+" draft [skip ci]")
+        return {"ok":True,"kind":data.kind,"id":data.id}
 
 
 class InstagramFactSlideEdit(BaseModel):
@@ -587,10 +603,16 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
     try:
         history, _ = await read_file("paintings", "instagram_state.json")
         entries = history.get("records") or {}
+        queued = next((entry for entry in entries.values()
+                       if entry.get("status") == "accepted" and entry.get("scheduled_for")), None)
+        next_publication = next_instagram_publication(history)
+        if queued and history.get("enabled"):
+            next_publication = {"next_at": queued["scheduled_for"], "reason": "scheduled",
+                                "timezone": "Europe/Moscow", "note": "В очереди Buffer"}
         status.update({
             "enabled": bool(history.get("enabled")),
             "next_check": next_instagram_check(enabled=bool(history.get("enabled"))),
-            "next_publication": next_instagram_publication(history),
+            "next_publication": next_publication,
             "next_story": next_instagram_story(history),
             "campaign": history.get("campaign") or {},
             "story_sent": sum(v.get("status") == "sent"
@@ -606,7 +628,12 @@ async def instagram_status(x_telegram_init_data: str = Header(default="")):
             "accepted": sum(v.get("status") in ("accepted", "sent") for v in entries.values()),
             "sent": sum(v.get("status") == "sent" for v in entries.values()),
             "uncertain": sum(v.get("status") == "uncertain" for v in entries.values()),
-            "failed": sum(v.get("status") == "failed" for v in entries.values()),
+            "failed": sum(v.get("status") in ("error", "failed") for v in entries.values()),
+            "delivery_errors": [
+                {"title": v.get("title"), "reason": v.get("error") or v.get("failure_message")
+                 or "Buffer требует проверки"}
+                for v in entries.values() if v.get("status") in ("failed", "error", "uncertain")
+            ],
         })
     except Exception:
         status["enabled"] = False
@@ -710,13 +737,19 @@ async def instagram_toggle(change: InstagramSwitch, x_telegram_init_data: str = 
         status = await buffer_inspection()
         if not status.get("connected"):
             raise HTTPException(409, "Buffer Instagram @ivoryartgallery is not connected")
-    history, sha = await read_file("paintings", "instagram_state.json")
-    if any(v.get("status") == "uncertain" for v in (history.get("records") or {}).values()):
-        raise HTTPException(409, "Review uncertain Instagram delivery before resuming")
-    history["enabled"] = change.enabled
-    await update_file("paintings", "instagram_state.json", history, sha,
-                      "Admin: enable Instagram" if change.enabled else "Admin: pause Instagram")
-    return {"enabled": change.enabled}
+    async with FEED_LOCK:
+        history, sha = await read_file("paintings", "instagram_state.json")
+        if any(v.get("status") == "uncertain" for v in (history.get("records") or {}).values()):
+            raise HTTPException(409, "Review uncertain Instagram delivery before resuming")
+        if not change.enabled:
+            try:
+                await hold_scheduled_feed(history)
+            except (ValueError, RuntimeError, httpx.HTTPError) as exc:
+                raise HTTPException(409, "Buffer не подтвердил паузу: " + str(exc)) from exc
+        history["enabled"] = change.enabled
+        await update_file("paintings", "instagram_state.json", history, sha,
+                          "Admin: enable Instagram" if change.enabled else "Admin: pause Instagram")
+        return {"enabled": change.enabled}
 
 
 class RichMediaSwitch(BaseModel):
