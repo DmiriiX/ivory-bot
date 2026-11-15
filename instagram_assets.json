@@ -696,6 +696,66 @@
       "creative_version": 4,
       "music": "Original IVORY ART instrumental ambient: luxury",
       "reel_fps": 30
+    },
+    "0945ebfdae212bf87068be47": {
+      "title": "Альпы",
+      "image_count": 2,
+      "gallery_source": "tilda_catalog",
+      "images": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/0945ebfdae212bf87068be47-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/0945ebfdae212bf87068be47-2.jpg"
+      ],
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/0945ebfdae212bf87068be47-luxury.mp4",
+      "reel_style": "luxury",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/0945ebfdae212bf87068be47-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/0945ebfdae212bf87068be47-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/0945ebfdae212bf87068be47-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/0945ebfdae212bf87068be47-story-1.jpg",
+      "creative_version": 4,
+      "music": "Original IVORY ART instrumental ambient: luxury",
+      "reel_fps": 30
+    },
+    "a651793a44fcceae126a6672": {
+      "title": "Мишка на коне",
+      "image_count": 2,
+      "gallery_source": "tilda_catalog",
+      "images": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/a651793a44fcceae126a6672-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/a651793a44fcceae126a6672-2.jpg"
+      ],
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/a651793a44fcceae126a6672-cinematic.mp4",
+      "reel_style": "cinematic",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/a651793a44fcceae126a6672-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/a651793a44fcceae126a6672-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/a651793a44fcceae126a6672-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/a651793a44fcceae126a6672-story-1.jpg",
+      "creative_version": 4,
+      "music": "Original IVORY ART instrumental ambient: cinematic",
+      "reel_fps": 30
+    },
+    "3b539193b85b606dcd1e043c": {
+      "title": "Отражения",
+      "image_count": 2,
+      "gallery_source": "tilda_catalog",
+      "images": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/3b539193b85b606dcd1e043c-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/3b539193b85b606dcd1e043c-2.jpg"
+      ],
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/3b539193b85b606dcd1e043c-luxury.mp4",
+      "reel_style": "luxury",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/3b539193b85b606dcd1e043c-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/3b539193b85b606dcd1e043c-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/3b539193b85b606dcd1e043c-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/3b539193b85b606dcd1e043c-story-1.jpg",
+      "creative_version": 4,
+      "music": "Original IVORY ART instrumental ambient: luxury",
+      "reel_fps": 30
     }
   }
 }
