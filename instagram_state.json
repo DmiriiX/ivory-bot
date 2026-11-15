@@ -83,7 +83,7 @@
     },
     "igfact:2": {
       "title": "Изобретение масляной живописи",
-      "status": "uncertain",
+      "status": "accepted",
       "format": "carousel",
       "editorial_cycle": true,
       "kind": "fact",
@@ -91,7 +91,9 @@
       "created_at": "2026-11-15T19:22:10.982081+00:00",
       "campaign": true,
       "campaign_date": "2026-11-17",
-      "scheduled_for": "2026-11-17T18:15:00+03:00"
+      "scheduled_for": "2026-11-17T18:15:00+03:00",
+      "buffer_post_id": "6afa0665e5a113497a0ae46b",
+      "buffer_status": "scheduled"
     }
   },
   "failed_attempts": [
