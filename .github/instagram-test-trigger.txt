@@ -15,3 +15,5 @@ Retry single verified Roads and Dreams with permanent public JPEG after read-onl
 Verify Buffer delivery/link for Roads and Dreams. The post already has a Buffer ID; do not create another post.
 
 Campaign kick-off catch-up: 2026-11-09 18:40 MSK, one Reel only, existing state prevents duplicates, Telegram and MAX unchanged.
+
+Recover the scheduled Instagram feed slot for 2026-11-15 using the standard publisher and its duplicate protection.
