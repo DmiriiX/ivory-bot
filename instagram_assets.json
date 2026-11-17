@@ -837,6 +837,26 @@
       "creative_version": 4,
       "music": "Original IVORY ART instrumental ambient: luxury",
       "reel_fps": 30
+    },
+    "fb4fed7e19d316c982254e1d": {
+      "title": "За сценой",
+      "image_count": 2,
+      "gallery_source": "tilda_catalog",
+      "images": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/fb4fed7e19d316c982254e1d-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/fb4fed7e19d316c982254e1d-2.jpg"
+      ],
+      "reel": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/fb4fed7e19d316c982254e1d-luxury.mp4",
+      "reel_style": "luxury",
+      "stories": [
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/fb4fed7e19d316c982254e1d-story-1.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/fb4fed7e19d316c982254e1d-story-2.jpg",
+        "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/fb4fed7e19d316c982254e1d-story-3.jpg"
+      ],
+      "story": "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/prepared/fb4fed7e19d316c982254e1d-story-1.jpg",
+      "creative_version": 4,
+      "music": "Original IVORY ART instrumental ambient: luxury",
+      "reel_fps": 30
     }
   }
 }
