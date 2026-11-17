@@ -11,6 +11,7 @@ FEED_DAYS = (1, 3, 5, 6)  # Tuesday, Thursday, Saturday, Sunday
 STORY_DAYS = (0, 2, 4)   # Monday, Wednesday, Friday
 FEED_TIME = time(18, 15)
 STORY_TIME = time(19, 15)
+FEED_SKIP_DATES = {date(2026, 11, 19)}
 
 
 def campaign_window(state, now=None):
@@ -35,6 +36,8 @@ def campaign_slot(state, kind="feed", now=None):
         day = max(start, now.date()) + timedelta(days=offset)
         if day > end:
             break
+        if kind == "feed" and day in FEED_SKIP_DATES:
+            continue
         # Launch Monday Nov 9 instead of Tuesday Nov 10:
         # exactly four feed posts during the first calendar week.
         kickoff = kind == "feed" and start == date(2026, 11, 9)

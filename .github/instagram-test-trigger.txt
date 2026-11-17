@@ -21,3 +21,5 @@ Recover the scheduled Instagram feed slot for 2026-11-15 using the standard publ
 Confirm Buffer delivery of the recovered November 15 Instagram feed slot.
 
 Initialize the Buffer queue for the upcoming Instagram campaign feed slot.
+
+Reconcile Buffer with the Thursday-only facts calendar and the November 19 feed skip.

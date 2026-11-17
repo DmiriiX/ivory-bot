@@ -74,11 +74,16 @@ def next_instagram_publication(history, now=None):
     if (history.get("campaign") or {}).get("enabled", False):
         from instagram_campaign import campaign_slot
         current = (now or datetime.now(MSK)).astimezone(MSK)
-        reserved = {v.get("campaign_date") for v in (history.get("records") or {}).values()}
-        slot = campaign_slot(history["campaign"], "feed", current)
-        if slot.get("next_at") and datetime.fromisoformat(slot["next_at"]).date().isoformat() in reserved:
-            return campaign_slot(history["campaign"], "feed", current + timedelta(days=1))
-        return slot
+        reserved = {v.get("campaign_date") for v in (history.get("records") or {}).values()
+                    if v.get("status") != "held"}
+        while True:
+            slot = campaign_slot(history["campaign"], "feed", current)
+            if not slot.get("next_at"):
+                return slot
+            target = datetime.fromisoformat(slot["next_at"])
+            if target.date().isoformat() not in reserved:
+                return slot
+            current = target + timedelta(days=1)
     now = (now or datetime.now(MSK)).astimezone(MSK)
     if not history.get("enabled", False):
         return {"next_at": None, "reason": "paused"}

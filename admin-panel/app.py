@@ -22,7 +22,7 @@ from media import normalized_image
 from instagram_gallery import discover_gallery, format_for_gallery
 from instagram_facts import (
     FACTS, MAX_FACT_CAPTION_LENGTH, fact_caption, fact_key, fact_slide_text,
-    fact_slides, next_fact, feed_calendar, cycle_next_kind,
+    fact_slides, next_fact, feed_calendar,
 )
 from instagram_fact_layout import MAX_SLIDE_TEXT_LENGTH, fact_text_pages
 from instagram_editorial import make_editorial_reel
@@ -435,11 +435,12 @@ async def instagram_editorial(x_telegram_init_data: str = Header(default="")):
             "slides_edited": fact_id in slide_overrides, "excluded": fact_id in exclusions,
             "status": (records.get(fact_key(fact)) or {}).get("status", "queue"),
         })
+    calendar = feed_calendar(history, facts, artworks=artworks,
+                             media=prepared if history.get("rich_media_enabled") else {})
     return {
         "facts_enabled":bool(history.get("ig_facts_enabled",False)),
-        "next_kind":cycle_next_kind(history) if history.get("ig_facts_enabled") else "artwork",
-        "calendar":feed_calendar(history,facts,artworks=artworks,
-                                 media=prepared if history.get("rich_media_enabled") else {}),
+        "next_kind":calendar[0]["kind"] if calendar else "artwork",
+        "calendar":calendar,
         "buffer_queue": [
             {"at": record["scheduled_for"], "kind": record["kind"], "format": record["format"],
              "id": str(record["fact_id"]) if record["kind"] == "fact" else key,

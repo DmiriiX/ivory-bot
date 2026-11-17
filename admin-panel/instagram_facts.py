@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from instagram_campaign import campaign_slot
+from instagram_campaign import FEED_SKIP_DATES, campaign_slot
 
 FACTS = json.loads(Path(__file__).with_name("instagram_fact_content.json").read_text(encoding="utf-8"))
 IMAGE_PREFIX = "https://raw.githubusercontent.com/DmiriiX/ivory-bot/main/instagram-media/facts/"
@@ -51,15 +51,13 @@ def fact_slides(fact, override=None):
     return [IMAGE_PREFIX + name for name in fact_slide_names(fact, override)]
 
 
-def cycle_records(state):
-    return sorted(
-       ((key,v) for key,v in (state.get("records") or {}).items()
-        if v.get("editorial_cycle") and v.get("status") in ("uncertain","accepted","sent","failed")),
-       key=lambda item:item[1].get("created_at",""))
+def fact_publication_day(day):
+    return day.weekday() == 3 and day not in FEED_SKIP_DATES
 
-def cycle_next_kind(state):
-    # Start with fact #1; then two gallery paintings; repeat.
-    return "fact" if len(cycle_records(state))%3==0 else "artwork"
+
+def feed_kind(state, day):
+    return "fact" if state.get("ig_facts_enabled") and fact_publication_day(day) else "artwork"
+
 
 def next_fact(facts,state):
     records=state.get("records") or {}
@@ -83,7 +81,6 @@ def feed_calendar(state,facts,now=None,count=12,artworks=None,media=None):
     """
     now=(now or datetime.now(MSK)).astimezone(MSK)
     campaign=state.get("campaign") or {}
-    sequence=len(cycle_records(state))
     next_no=int(next_fact(facts,state)["id"]) if next_fact(facts,state) else None
     results=[]
     date_cursor=now
@@ -104,7 +101,7 @@ def feed_calendar(state,facts,now=None,count=12,artworks=None,media=None):
         dt=datetime.fromisoformat(slot["next_at"])
         date_cursor=dt+timedelta(hours=5,minutes=31)
         if dt.date().isoformat() in existing_dates:continue
-        kind="fact" if state.get("ig_facts_enabled") and sequence%3==0 else "artwork"
+        kind=feed_kind(state, dt.date())
         if kind=="fact":
             fact=next((f for f in facts if int(f["id"])==next_no),None) if next_no else None
             item={"at":dt.isoformat(),"kind":"fact","format":"carousel",
@@ -150,6 +147,5 @@ def feed_calendar(state,facts,now=None,count=12,artworks=None,media=None):
                       "title":"Работы в очереди закончились","status":"planned"}
             already_art+=1
         results.append(item)
-        sequence+=1
         if len(results)>=count:break
     return results

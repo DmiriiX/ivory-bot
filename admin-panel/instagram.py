@@ -9,11 +9,11 @@ import html
 import json
 import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from schedule_info import next_instagram_publication
-from instagram_campaign import MSK, campaign_slot, due_now, feed_format
-from instagram_facts import MAX_FACT_CAPTION_LENGTH, next_fact, cycle_next_kind, fact_key, fact_caption, fact_slides
+from instagram_campaign import FEED_SKIP_DATES, MSK, due_now, feed_format
+from instagram_facts import MAX_FACT_CAPTION_LENGTH, next_fact, feed_kind, fact_publication_day, fact_key, fact_caption, fact_slides
 import base64
 from media import normalized_image
 from instagram_translations import TITLES, ARTISTS
@@ -450,17 +450,36 @@ async def _sync_instagram(read_file, update_file, identity, github_api, manual=F
         except Exception:
             rich_index = {"artworks": {}}
 
+    now_msk = datetime.now(MSK)
+    if manual and (now_msk.date() in FEED_SKIP_DATES or
+                   (selected_kind == "fact" and not fact_publication_day(now_msk.date()))):
+        return {"ok": False, "reason": "Факты выходят по четвергам. На 19 ноября выпуск отменён."
+                if selected_kind == "fact" else "19 ноября публикаций в ленте Instagram нет."}
+
     # Check previously accepted posts without creating duplicates.
     for item_id, record in list(records.items()):
         if record.get("status") in ("accepted", "uncertain") and record.get("buffer_post_id"):
+            day = date.fromisoformat(record["campaign_date"]) if record.get("campaign_date") else None
+            wrong_slot = day and (day in FEED_SKIP_DATES or
+                                  (record.get("kind") == "fact" and not fact_publication_day(day)))
             try:
                 remote = await get_buffer_status(record["buffer_post_id"])
-                if remote.get("status") in ("sent", "error", "failed"):
+                status = remote["status"]
+                if status in ("sent", "error", "failed"):
                     apply_delivery_status(record, remote)
-                    latest = await update_file("paintings", "instagram_state.json", state, sha, "Update Instagram delivery status")
-                    sha = (latest.get("content") or {}).get("sha") or (await read_file("paintings", "instagram_state.json"))[1]
+                elif wrong_slot and record.get("scheduled_for"):
+                    if status == "scheduled":
+                        status = (await edit_buffer_post(record["buffer_post_id"], saveToDraft=True))["status"]
+                    if status != "draft":
+                        return {"ok": False, "reason": "Buffer ещё обрабатывает публикацию вне нового расписания"}
+                    record.update(status="held", buffer_status="draft")
+                else:
+                    continue
+                latest = await update_file("paintings", "instagram_state.json", state, sha, "Update Instagram delivery status")
+                sha = (latest.get("content") or {}).get("sha") or (await read_file("paintings", "instagram_state.json"))[1]
             except Exception:
-                pass
+                if wrong_slot:
+                    return {"ok": False, "reason": "Не удалось сверить публикацию вне нового расписания в Buffer"}
     # Don't start a second submission if one is uncertain.
     if any(v.get("status") == "uncertain" for v in records.values()):
         return {"ok": False, "reason": "Uncertain delivery requires manual review"}
@@ -470,42 +489,17 @@ async def _sync_instagram(read_file, update_file, identity, github_api, manual=F
         return {"ok": True, "reason": "Previous Buffer publication awaits delivery confirmation"}
     campaign = state.get("campaign") or {}
     in_campaign = bool(campaign.get("enabled"))
-    now_msk = datetime.now(MSK)
     due_at = None
-    campaign_date = now_msk.date().isoformat()
-    held = next((record for record in records.values() if record.get("status") == "held"), None)
-    if held:
-        if manual:
-            return {"ok": False, "reason": "A held Instagram post awaits rescheduling"}
-        # Reuse the original draft and ID when Instagram is resumed.
-        target = datetime.fromisoformat(held["scheduled_for"])
-        if target <= now_msk:
-            slot = campaign_slot(campaign, now=now_msk).get("next_at")
-            if slot and datetime.fromisoformat(slot) <= now_msk:
-                slot = campaign_slot(campaign, now=now_msk + timedelta(days=1, hours=-now_msk.hour)).get("next_at")
-            if not slot or datetime.fromisoformat(slot) <= now_msk:
-                return {"ok": True, "reason": "No remaining campaign slot for the held Instagram draft"}
-            target = datetime.fromisoformat(slot)
-        if target > now_msk + FEED_QUEUE_LEAD:
-            return {"ok": True, "reason": "Held Instagram draft is outside the queueing window"}
-        remote = await get_buffer_status(held["buffer_post_id"])
-        if remote.get("status") == "draft":
-            remote = await edit_buffer_post(held["buffer_post_id"], saveToDraft=False,
-                                            **buffer_schedule(target))
-        held.update(scheduled_for=target.isoformat(), campaign_date=target.date().isoformat())
-        record_submission(held, remote, target)
-        await update_file("paintings", "instagram_state.json", state, sha, "Reschedule held Instagram draft")
-        return {"ok": held["status"] == "accepted", "status": held["status"],
-                "reason": held.get("error"), "scheduled_for": held["scheduled_for"]}
+    campaign_day = now_msk.date()
     if in_campaign:
         if not manual:
             target, due_at = campaign_feed_target(state, now_msk)
             if target is None:
                 return {"ok": True, "reason": "No campaign feed slot in the queueing window",
                         "next_publication": next_instagram_publication(state)}
-            campaign_date = target.date().isoformat()
-        if not (manual and selected_id) and any(rec.get("campaign_date") == campaign_date
-                                                for rec in records.values()):
+            campaign_day = target.date()
+        if not (manual and selected_id) and any(rec.get("campaign_date") == campaign_day.isoformat()
+                and rec.get("status") != "held" for rec in records.values()):
             return {"ok": True, "reason": "Feed slot already reserved today"}
     else:
         today_slot = next_instagram_publication(
@@ -515,11 +509,24 @@ async def _sync_instagram(read_file, update_file, identity, github_api, manual=F
                 or datetime.fromisoformat(today_slot["next_at"]).date() != now_msk.date()):
             return {"ok": True, "reason": "Instagram cadence: next publishing slot",
                     "next_publication": next_instagram_publication(state)}
-    # Independent Instagram editorial series. It starts at fact #1 regardless
-    # of what Telegram/MAX facts bot has already posted. No IG history reset.
-    if (selected_kind == "fact" or
-            (not selected_kind and in_campaign and state.get("ig_facts_enabled")
-             and cycle_next_kind(state) == "fact")):
+    campaign_date = campaign_day.isoformat()
+    kind = selected_kind or (feed_kind(state, campaign_day) if in_campaign else "artwork")
+    held = next((record for record in records.values()
+                 if record.get("status") == "held" and record.get("kind") == kind), None)
+    if held and not (manual and selected_id):
+        remote = await get_buffer_status(held["buffer_post_id"])
+        if remote["status"] == "draft":
+            changes = buffer_schedule(due_at) if due_at else {"mode": "shareNow"}
+            remote = await edit_buffer_post(held["buffer_post_id"], saveToDraft=False, **changes)
+        held.update(scheduled_for=due_at.isoformat() if due_at else None, campaign_date=campaign_date)
+        if remote["status"] == "sent":
+            apply_delivery_status(held, remote)
+        else:
+            record_submission(held, remote, due_at)
+        await update_file("paintings", "instagram_state.json", state, sha, "Reschedule held Instagram draft")
+        return {"ok": held["status"] in ("accepted", "sent"), "status": held["status"],
+                "reason": held.get("error"), "scheduled_for": held["scheduled_for"]}
+    if kind == "fact":
         facts, _ = await read_file("facts", "posts.json")
         fact = (next((p for p in facts if str(p.get("id")) == selected_id), None)
                 if selected_id else next_fact(facts, state))

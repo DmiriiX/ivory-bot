@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch,AsyncMock
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from instagram_facts import FACTS, MAX_FACT_CAPTION_LENGTH, fact_caption, fact_key, next_fact, cycle_next_kind, feed_calendar, fact_media, fact_slides
+from instagram_facts import FACTS, MAX_FACT_CAPTION_LENGTH, fact_caption, fact_key, next_fact, feed_kind, feed_calendar, fact_media, fact_slides
 from instagram_fact_layout import fact_text_pages
 from instagram_campaign import MSK
 import instagram
@@ -29,28 +29,18 @@ class FactsEditorialTests(unittest.TestCase):
     self.assertEqual(words,fact[language].split())
   state={"records":{},"used_indices":[0,1,2,3],"used_ids":["anything"]}
   self.assertEqual(next_fact(FACT_LIST,state)["id"],1)
-  self.assertEqual(cycle_next_kind(state),"fact")
+  self.assertEqual(feed_kind(dict(state, ig_facts_enabled=True), datetime(2026,11,12).date()),"fact")
   self.assertEqual(fact_media(FACT_LIST[0]).split("/")[-1],"fact-01-carousel-1.jpg")
 
- def test_independent_cycle_fact_painting_painting(self):
-  state={"records":{}}
-  self.assertEqual(cycle_next_kind(state),"fact")
-  state["records"]["igfact:1"]={"editorial_cycle":True,"status":"accepted","created_at":"2026-11-12T00:00:00Z"}
-  self.assertEqual(cycle_next_kind(state),"artwork")
-  state["records"]["p1"]={"editorial_cycle":True,"status":"sent","created_at":"2026-11-13T00:00:00Z"}
-  self.assertEqual(cycle_next_kind(state),"artwork")
-  state["records"]["p2"]={"editorial_cycle":True,"status":"accepted","created_at":"2026-11-14T00:00:00Z"}
-  self.assertEqual(cycle_next_kind(state),"fact")
-  self.assertEqual(next_fact(FACT_LIST,state)["id"],2)
-
- def test_calendar_first_is_fact_and_moscow_time(self):
+ def test_calendar_only_schedules_facts_on_thursdays_and_skips_november_19(self):
   state={"campaign":CAMPAIGN,"records":{},"ig_facts_enabled":True}
-  plan=feed_calendar(state,FACT_LIST,now=datetime(2026,11,12,12,0,tzinfo=MSK),count=4)
-  self.assertEqual([x["kind"] for x in plan],["fact","artwork","artwork","fact"])
-  self.assertEqual(plan[0]["id"],"1")
-  self.assertEqual(plan[3]["id"],"2")
+  plan=feed_calendar(state,FACT_LIST,now=datetime(2026,11,12,12,0,tzinfo=MSK),count=10)
+  self.assertEqual([x["at"][:10] for x in plan if x["kind"]=="fact"],
+                   ["2026-11-12","2026-11-26"])
+  self.assertEqual([x["id"] for x in plan if x["kind"]=="fact"],["1","2"])
+  self.assertFalse(any(x["at"].startswith("2026-11-19") for x in plan))
   self.assertTrue(all(x["at"].endswith("+03:00") for x in plan))
-  self.assertEqual(len({x["at"][:10] for x in plan}),4)
+  self.assertEqual(len({x["at"][:10] for x in plan}),10)
 
  def test_calendar_predicts_actual_artworks_and_media_types(self):
   from instagram_facts import artwork_key
@@ -122,7 +112,7 @@ class FactsEditorialTests(unittest.TestCase):
   import asyncio
   from zoneinfo import ZoneInfo
   async def check():
-   fixed=datetime(2026,11,13,12,0,tzinfo=ZoneInfo("Europe/Moscow"))  # Friday, no feed slot
+   fixed=datetime(2026,11,12,12,0,tzinfo=ZoneInfo("Europe/Moscow"))
    state={"enabled":True,"campaign":CAMPAIGN,"ig_facts_enabled":True,"records":{}}
    async def read(kind,path):
     if path=="instagram_state.json":return state,"sha"
@@ -132,7 +122,7 @@ class FactsEditorialTests(unittest.TestCase):
     clock.now.return_value=fixed
     result=await instagram.sync_instagram(read,AsyncMock(),lambda *args:"unused",None,manual=True)
     self.assertEqual(result["reason"],"Instagram facts queue exhausted; review before publishing artwork")
-    state["records"]={"already":{"campaign_date":"2026-11-13","status":"sent"}}
+    state["records"]={"already":{"campaign_date":"2026-11-12","status":"sent"}}
     result=await instagram.sync_instagram(read,AsyncMock(),lambda *args:"unused",None,manual=True)
     self.assertEqual(result["reason"],"Feed slot already reserved today")
     send.assert_not_called()
@@ -154,7 +144,9 @@ class FactsEditorialTests(unittest.TestCase):
    with patch.object(instagram,"inspection",new=AsyncMock(return_value={"connected":True})), \
         patch.object(instagram,"unavailable_fact_slide",new=AsyncMock(return_value=None)), \
         patch.object(instagram,"instagram_channel",new=AsyncMock(return_value={"id":"channel"})), \
-        patch.object(instagram,"create_buffer_post",new=sender):
+        patch.object(instagram,"create_buffer_post",new=sender), \
+        patch.object(instagram,"datetime") as clock:
+    clock.now.return_value=datetime(2026,11,12,18,15,tzinfo=MSK)
     result=await instagram.sync_instagram(read,update,lambda *args:"unused",None,manual=True,
                     selected_kind="fact",selected_id="2",selected_format="carousel")
    self.assertEqual(result["id"],"igfact:2")
